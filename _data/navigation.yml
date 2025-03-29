@@ -18,7 +18,9 @@ main:
 # sidebar navigation (categories)
 # 2022.02.15 sidebar update : simple ver.
 categories:
-  - title: "Categories1"
-    url: /categories/categories1/
+  - title: "Technical Books"
+    children:
+      -title: "혼자 공부하는 컴퓨터 구조 + 운영체제"
+      url: /categories/self-taught-ca-os/
   - title: "Test"
     url: /categories/test/

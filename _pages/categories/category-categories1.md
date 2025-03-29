@@ -1,9 +1,9 @@
 ---
-title: "Categories1"
+title: "혼자 공부하는 컴퓨터 구조 + 운영체제"
 layout: category
-permalink: /categories/categories1/
+permalink: /categories/self-taught-ca-os/
 author_profile: true
-taxonomy: Categories1
+taxonomy: 혼자 공부하는 컴퓨터 구조 + 운영체제
 sidebar:
   nav: "categories"
 ---
