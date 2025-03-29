@@ -3,7 +3,7 @@ title: "여기가 제목인가요?"
 excerpt: "여긴 요약인가?"
 
 categories:
-  - Categories1
+  - Test
 tags:
   - [tag1, tag2]
 
