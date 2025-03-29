@@ -7,7 +7,7 @@ categories:
 tags:
   - [tag1, tag2]
 
-permalink: /categories1/tset/
+permalink: /test/test
 
 toc: true
 toc_sticky: true
