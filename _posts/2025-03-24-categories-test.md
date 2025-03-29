@@ -7,7 +7,7 @@ categories:
 tags:
   - [tag1, tag2]
 
-permalink: /test/test
+permalink: /test/test/
 
 toc: true
 toc_sticky: true
