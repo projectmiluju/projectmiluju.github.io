@@ -7,7 +7,7 @@ categories:
 tags:
   - [tag1, tag2]
 
-permalink: /self-taught-ca-os/computer_architecture/
+permalink: /self-taught-ca-os/computer-architecture/
 
 toc: true
 toc_sticky: true
