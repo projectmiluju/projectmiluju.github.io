@@ -17,10 +17,7 @@ last_modified_at: 2025-03-29
 ---
 
 ## ▶️ 본문
-
-본문은 여기에 ...
-
-## ▶️ 목차
+<img src="https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/9791162243091.jpg" width="30%" height="30%" alt="혼공컴구운체">
 
 ## ▶️ Chapter01 컴퓨터 구조 시작하기
 ## ▶️ Chapter02 데이터
@@ -37,3 +34,7 @@ last_modified_at: 2025-03-29
 ## ▶️ Chapter13 교착 상태
 ## ▶️ Chapter14 가상 메모리
 ## ▶️ Chapter15 파일 시스템
+
+<details><summary>옆에 삼각형 모양을 눌러주세요</summary>
+추가적인 메모가 가능합니다.
+</details>
