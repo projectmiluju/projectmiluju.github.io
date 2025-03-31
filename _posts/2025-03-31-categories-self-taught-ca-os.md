@@ -18,7 +18,7 @@ last_modified_at: 2025-03-29
 
 <img src="https://contents.kyobobook.co.kr/sih/fit-in/458x0/pdt/9791162243091.jpg" width="30%" height="30%" alt="혼공컴구운체">
 
-## [Chapter01 컴퓨터 구조 시작하기](https://projectmiluju.github.io/self-taught-ca-os/computer_architecture/)
+## [Chapter01 컴퓨터 구조 시작하기](https://projectmiluju.github.io/self-taught-ca-os/computer-architecture/)
 ## Chapter02 데이터
 ## Chapter03 명령어
 ## Chapter04 CPU의 작동 원리
