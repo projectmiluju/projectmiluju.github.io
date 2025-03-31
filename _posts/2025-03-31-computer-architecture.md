@@ -59,14 +59,22 @@ last_modified_at: 2025-03-31
 >
 > `명령어는 컴퓨터를 작동시키는 정보`   
 > `데이터는 명령어를 위해 존재하는 재료`
+
 ***
 
 > 컴퓨터의 4가지 핵심 부품   
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/3.png?raw=true" width="50%" height="50%" alt="네가지핵심부품">   
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/4.png?raw=true" width="50%" height="50%" alt="핵심부품">
->> CPU :   
+>>    
 >> 메모리 : 현재 실행되는 프로그램의 명령어와 데이터를 저장하는 부품   
->> 보조기억장치 :    
->> 입출력장치 :   
+>> CPU
+>>> 메모리에 저장된 값을 읽어 들이고, 해석하고, 실행하는 장치    
+>>> ALU는 계산하는 장치  
+>>> 레지스터는 임시 저장 장치   
+>>> 제어장치는 제어 신호를 발생시키고 명령어를 해석하는 장치      
+>>
+>>
+>> 보조기억장치 : 하드 디스크 , SSD, USB 메모리 , DVD, CD-ROM 과 같은 저장 장치   
+>> 입출력장치 : 마이크, 스피커, 프린터, 마우스, 키보드처럼 컴퓨터 외부에 연결되어 컴퓨터 내부와 정보를 교환하는 장치
 
   
