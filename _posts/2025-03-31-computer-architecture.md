@@ -25,7 +25,7 @@ last_modified_at: 2025-03-31
 
 ***
 
-> :carrot: 문제해결  
+> 문제해결  
 >>코드상의 문제가 없는데 코드가 제대로 작동하지 않을 때    
 >>컴퓨터를 '미지의 대상'이 아닌 '분석의 대상'으로..   
 >> 기업에서도 기술 면접으로 컴퓨터 구조에 대한 소양을 검증
@@ -48,12 +48,12 @@ last_modified_at: 2025-03-31
 
 ## 2 컴퓨터 구조의 큰그림
 
-<img src="../assets/images/1.png" width="50%" height="50%" alt="컴퓨터구조">
+<img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/1.png?raw=true" width="50%" height="50%" alt="컴퓨터구조">
 
 ***
 
 > 컴퓨터가 이해하는 정보   
-> <img src="../assets/images/2.png" width="50%" height="50%" alt="컴퓨터가이해하는정보">
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/2.png?raw=true" width="50%" height="50%" alt="컴퓨터가이해하는정보">
 >> 데이터 : 컴퓨터가 이해하는 숫자, 문자, 이미지, 동영상과 같은 정적인 정보   
 >> 명령어 : 데이터를 움직이고 컴퓨터를 작동시키는 정보
 >
@@ -62,7 +62,8 @@ last_modified_at: 2025-03-31
 ***
 
 > 컴퓨터의 4가지 핵심 부품   
-> <img src="../assets/images/3.png" width="50%" height="50%" alt="네가지핵심부품">   
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/3.png?raw=true" width="50%" height="50%" alt="네가지핵심부품">   
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/4.png?raw=true" width="50%" height="50%" alt="핵심부품">
 >> CPU :   
 >> 메모리 : 현재 실행되는 프로그램의 명령어와 데이터를 저장하는 부품   
 >> 보조기억장치 :    
