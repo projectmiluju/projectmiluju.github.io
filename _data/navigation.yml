@@ -30,6 +30,7 @@ categories:
         url: /categories/maeil-back-end/
       - title: "Front-end"
         url: /categories/maeil-front-end/
-
+  - title: "React"
+    url : /categories/react/
   - title: "Test"
     url: /categories/test/
