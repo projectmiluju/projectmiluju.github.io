@@ -110,27 +110,10 @@ beforeEach(() => {
 
 ***
 
-## 권장하는 테스트 스타일
-
-[//]: # (| 추천 | 비추천 |)
-
-[//]: # (|:-----|:------|)
-
-[//]: # (| 사용자 행동 중심 테스트 | 내부 상태 확인 테스트 |)
-
-[//]: # (| 명확하고 긴 테스트 이름 | "짧고 모호한" 테스트 이름 |)
-
-[//]: # (| 접근성 고려 &#40;getByRole 등 사용&#41; | className, id에 의존 |)
-
-[//]: # (| 비동기 작업에 async/await 사용 | 무조건 setTimeout 사용하는 비정상 동기화 |)
-
-***
-
 ## 참고 자료
 
 - [React Testing Library 공식 문서](https://testing-library.com/docs/)
 - [Jest 공식 문서](https://jestjs.io/docs/getting-started)
 - [Testing Trophy by Kent C. Dodds](https://testingjavascript.com/)
 
----
-
+***
