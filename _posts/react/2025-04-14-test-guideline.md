@@ -7,7 +7,7 @@ categories:
 tags:
   - [tag1, tag2]
 
-permalink: /react/react-test-guideline/
+permalink: /react/test-guideline/
 
 toc: true
 toc_sticky: true
