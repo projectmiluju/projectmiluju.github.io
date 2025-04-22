@@ -7,7 +7,7 @@ categories:
 tags:
   - [tag1, tag2]
 
-permalink: /self-taught-ca-os/hcw/
+permalink: /self-taught-ca-os/hcpu/
 
 toc: true
 toc_sticky: true
