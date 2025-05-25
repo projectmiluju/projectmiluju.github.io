@@ -24,7 +24,7 @@ last_modified_at: 2025-03-29
 ## [Chapter04 CPU의 작동 원리](https://projectmiluju.github.io/self-taught-ca-os/cpu/)
 ## Chapter05 CPU 성능 향상 기법
 ## [Chapter06 메모리와 캐시 메모리](https://projectmiluju.github.io/self-taught-ca-os/memory/)
-## [Chapter07 보조기억장치]()
+## [Chapter07 보조기억장치](https://projectmiluju.github.io/self-taught-ca-os/auxiliary-storage/)
 ## Chapter08 입출력장치
 ## Chapter09 운영체제 시작하기
 ## Chapter10 프로세스와 스레드
