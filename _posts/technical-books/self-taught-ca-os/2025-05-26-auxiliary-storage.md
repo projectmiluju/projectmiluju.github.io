@@ -12,8 +12,8 @@ permalink: /self-taught-ca-os/auxiliary-storage/
 toc: true
 toc_sticky: true
 
-date: 2025-05-26
-last_modified_at: 2025-05-26
+date: 2025-05-25
+last_modified_at: 2025-05-25
 ---
 
 
