@@ -30,9 +30,9 @@ last_modified_at: 2025-05-25
 > 저장 밀도가 높고 대용량 저장에 유리하여 현재까지 많이 사용되고 있다.
 
 ***
-> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/27.png?raw=true" width="100%" height="100%" alt="스핀들 플래터">           
-> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/28.png?raw=true" width="100%" height="100%" alt="헤드 디스크암">
-
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/27.png?raw=true" width="50%" height="50%" alt="스핀들 플래터">           
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/28.png?raw=true" width="50%" height="50%" alt="헤드 디스크암">   
+>
 >| 구성 요소            | 설명                                         |
 >| ---------------- | ------------------------------------------ |
 >| **플래터(Platter)** | 원판 형태로 데이터를 저장하는 자기 디스크                    |
@@ -40,6 +40,8 @@ last_modified_at: 2025-05-25
 >| **스핀들(Spindle)** | 플래터를 회전시키는 축 역할                            |
 >| **디스크 암(Arm)**   | 헤드를 이동시키는 기계적 팔                            |
 >| **디스크 모터**       | 디스크를 고속으로 회전시킴 (대표적으로 7200RPM 또는 15000RPM) |
+
+***
 
 ***
 
