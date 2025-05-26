@@ -20,8 +20,10 @@ last_modified_at: 2025-05-25
 ## 1 다양한 보조기억장치
 
 ***
+
 > 가장 대중적인 보조기억장치는 하드디스크와 플래시 메모리이다.  
 > 이들은 컴퓨터 시스템에서 데이터를 영구적으로 저장하는 데 사용된다.
+
 ***
 
 ### 하드디스크 (HDD: Hard Disk Drive)
@@ -43,15 +45,23 @@ last_modified_at: 2025-05-25
 
 ***
 
->| 용어                            | 설명                                  |
->| ----------------------------- | ----------------------------------- |
->| **트랙(Track)**          | 플래터의 동심원 형태의 원형 경로                |
->| **섹터(Sector)** | 트랙을 나눈 조각, 하나의 섹터는 일반적으로 512바이트 |
->| **블록(Block):**      | 여러 섹터를 묶은 단위                   |
->| **실린더(Cylinder):**      | 여러 플래터의 동일한 트랙 위치를 수직으로 연결한 단위                  |
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/29.png?raw=true" width="50%" height="50%" alt="섹터">  
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/30.png?raw=true" width="50%" height="50%" alt="실린더"> 
+> 
+>| 용어                            | 설명                                 |
+>| ----------------------------- |------------------------------------|
+>| **트랙(Track)**          | 플래터의 동심원 형태의 원형 경로                 |
+>| **섹터(Sector)** | 트랙을 나눈 조각, 하나의 섹터는 일반적으로 512바이트    |
+>| **블록(Block):**      | 여러 섹터를 묶은 단위                       |
+>| **실린더(Cylinder):**      | 여러 플래터의 동일한 트랙 위치를 수직으로 연결한 논리적 단위 |
 
 ***
 
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/31.png?raw=true" width="50%" height="50%" alt="탐색시간"> 
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/32.png?raw=true" width="50%" height="50%" alt="회전지연"> 
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/33.png?raw=true" width="50%" height="50%" alt="전송시간">
+> 
+> 
 >| 용어                            | 설명                                  |
 >| ----------------------------- | ----------------------------------- |
 >| **탐색 시간(Seek Time)**          | 헤드가 목표 트랙으로 이동하는 시간                 |
