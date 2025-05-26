@@ -77,16 +77,16 @@ last_modified_at: 2025-05-25
 > 우리가 흔히 사용하는 USB 드라이브, SD 카드, SSD가 모두 플래시 메모리 기반의 보조기억장치이다.    
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/34.png?raw=true" width="50%" height="50%" alt="플래시메모리">
 
-
 ***
 
->
+> 대부분의 저장 장치는 NAND 플래시를 사용한다.   
+> 일반적으로 플래시 메모리라고 하면 NAND 플래시를 의미한다.
+> 
 > | 종류           | 설명             | 특징                        |
 > | ------------ | -------------- | ------------------------- |
 > | **NAND 플래시** | NAND 게이트 기반 회로 | 저장장치(SSD, USB 등)에 주로 사용   |
 > | **NOR 플래시**  | NOR 게이트 기반 회로  | 프로그램 코드 저장에 적합 (읽기 속도 빠름) |
-> 대부분의 저장 장치는 NAND 플래시를 사용한다.   
-> 일반적으로 플래시 메모리라고 하면 NAND 플래시를 의미한다.
+
 
 ***
 
