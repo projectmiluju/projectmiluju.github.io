@@ -74,7 +74,9 @@ last_modified_at: 2025-05-25
 
 > **플래시 메모리**는 **전기적으로 데이터를 읽고 쓰는 반도체 기반의 저장장치**이다.     
 > 하드디스크에 비해 빠른 속도와 작은 크기 덕분에 아래와 같은 다양한 저장 장치에 사용된다.    
-> 우리가 흔히 사용하는 USB 드라이브, SD 카드, SSD가 모두 플래시 메모리 기반의 보조기억장치이다.
+> 우리가 흔히 사용하는 USB 드라이브, SD 카드, SSD가 모두 플래시 메모리 기반의 보조기억장치이다.    
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/34.png?raw=true" width="50%" height="50%" alt="플래시메모리">
+
 
 ***
 
@@ -90,7 +92,12 @@ last_modified_at: 2025-05-25
 > **셀(Cell)** 기반 저장 빙식  
 > 셀이란 플래시 메모리에서 데이터를 저장하는 가방 작은 단뒤이다.       
 > 저장 용량과 효율성에 영향을 미친다.
-
+>
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/35.png?raw=true" width="50%" height="50%" alt="SLC">     
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/36.png?raw=true" width="50%" height="50%" alt="MLC">     
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/37.png?raw=true" width="50%" height="50%" alt="TLC">     
+> 
+>
 >| 타입                          | 설명            | 저장 비트 수 |
 >| --------------------------- | ------------- | ------- |
 >| **SLC (Single-Level Cell)** | 1개의 셀에 1비트 저장 | 1bit    |
