@@ -103,7 +103,8 @@ last_modified_at: 2025-05-25
 >| **SLC (Single-Level Cell)** | 1개의 셀에 1비트 저장 | 1bit    |
 >| **MLC (Multi-Level Cell)**  | 1개의 셀에 2비트 저장 | 2bit    |
 >| **TLC (Triple-Level Cell)** | 1개의 셀에 3비트 저장 | 3bit    |
-
+>
+> 
 >| 항목       | SLC  | MLC  | TLC  |
 >| -------- | ---- | ---- | ---- |
 >| 저장 비트 수  | 1bit | 2bit | 3bit |
@@ -113,18 +114,25 @@ last_modified_at: 2025-05-25
 
 ***
 
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/38.png?raw=true" width="50%" height="50%" alt="페이지">     
+>
 > **페이지(Page)** : 셀들이 모인 가장 작은 읽기,쓰기 단위  
 >> **Free** : 빈 상태, 쓰기 가능    
 >> **Valid**: 유효한 데이터    
 >> **Invalid**: 쓰레기 데이터 (덮어쓰기 불가)
 > 
 > **블록(Block)** : 여러 페이지가 모인 단위, 삭제는 블록 단위로만 가능     
-> **플레인(Plane)** : 블록들이 모인 구조
+> **플레인(Plane)** : 블록들이 모인 구조   
 > **다이(Die)** : 플레인들이 모인 구조, 플래시 메모리의 기본 단위
  
 ***
 
 > **가비지 컬렉션 (Garbage Collection)**  
+> 
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/39.png?raw=true" width="50%" height="50%" alt="1">     
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/40.png?raw=true" width="50%" height="50%" alt="2">     
+> <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/41.png?raw=true" width="50%" height="50%" alt="3">
+>
 > Invalid 페이지가 쌓이면 새로운 블록으로 Valid 데이터만 복사 후 기존 블록을 삭제하는 정리 과정   
 > SSD의 성능 유지와 수명 관리를 위한 핵심 기능
 
