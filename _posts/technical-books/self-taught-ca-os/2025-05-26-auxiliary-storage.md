@@ -32,6 +32,9 @@ last_modified_at: 2025-05-25
 > 저장 밀도가 높고 대용량 저장에 유리하여 현재까지 많이 사용되고 있다.
 
 ***
+
+> **하드디스크의 구조** 
+> 
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/27.png?raw=true" width="50%" height="50%" alt="스핀들 플래터">           
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/28.png?raw=true" width="50%" height="50%" alt="헤드 디스크암">   
 >
@@ -45,6 +48,8 @@ last_modified_at: 2025-05-25
 
 ***
 
+> **하드디스크의 데이터 구조**
+> 
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/29.png?raw=true" width="50%" height="50%" alt="섹터">  
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/30.png?raw=true" width="50%" height="50%" alt="실린더"> 
 > 
@@ -57,6 +62,8 @@ last_modified_at: 2025-05-25
 
 ***
 
+> **하드디스크의 동작 원리**
+> 
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/31.png?raw=true" width="50%" height="50%" alt="탐색시간"> 
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/32.png?raw=true" width="50%" height="50%" alt="회전지연"> 
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/33.png?raw=true" width="50%" height="50%" alt="전송시간">
@@ -115,6 +122,8 @@ last_modified_at: 2025-05-25
 
 ***
 
+> **플래시 메모리의 구조**
+> 
 > <img src="https://github.com/projectmiluju/projectmiluju.github.io/blob/master/assets/images/38.png?raw=true" width="50%" height="50%" alt="페이지">     
 >
 > **페이지(Page)** : 셀들이 모인 가장 작은 읽기,쓰기 단위  
