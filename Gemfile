@@ -1,5 +1,9 @@
 source "https://rubygems.org"
-gemspec
 
-gem 'jekyll-admin', group: :jekyll_plugins
-gem 'jekyll-sitemap'
+group :jekyll_plugins do
+  gem "github-pages"
+end
+
+group :development do
+  gem "jekyll-admin"
+end
