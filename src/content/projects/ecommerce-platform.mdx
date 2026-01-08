@@ -1,0 +1,214 @@
+---
+title: "대규모 이커머스 플랫폼 백엔드 리아키텍처"
+period: "2024.01 - 2024.06"
+role: "Backend Lead"
+stack: ["Java", "Spring Boot", "Kubernetes", "Redis", "PostgreSQL", "Kafka", "ArgoCD"]
+links:
+  github: "https://github.com/projectmiluju/ecommerce-backend"
+highlights:
+  - "MSA 전환으로 배포 독립성 확보"
+  - "Redis 캐싱으로 상품 조회 응답시간 70% 개선"
+  - "Kafka 기반 이벤트 드리븐 아키텍처 설계"
+metrics:
+  - "API 응답시간 200ms → 60ms (70% 개선)"
+  - "배포 시간 30분 → 5분 (83% 단축)"
+  - "시스템 가용성 99.95% 달성"
+cover: "/images/projects/ecommerce-cover.png"
+order: 1
+---
+
+## 문제 정의
+
+레거시 모놀리식 아키텍처에서 다음 문제가 발생했습니다:
+- 단일 장애점(SPOF)으로 인한 전체 시스템 다운 위험
+- 배포 시 전체 서비스 재시작 필요 (평균 30분 다운타임)
+- 트래픽 급증 시 특정 기능만 스케일 아웃 불가
+
+## 역할과 범위
+
+**역할**: 백엔드 아키텍처 설계 및 핵심 서비스 구현 리드  
+**범위**: 상품, 주문, 결제, 재고 도메인 MSA 분리 및 인프라 구축
+
+---
+
+## 아키텍처
+
+시스템 아키텍처 다이어그램 (추후 이미지 추가):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      API Gateway (Kong)                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│ Product Service│   │ Order Service │   │ Payment Service│
+│   (Spring)    │   │   (Spring)    │   │   (Spring)    │
+└───────┬───────┘   └───────┬───────┘   └───────┬───────┘
+        │                   │                   │
+        ▼                   ▼                   ▼
+    PostgreSQL           PostgreSQL          PostgreSQL
+        │                   │                   │
+        └───────────────────┴───────────────────┘
+                            │
+                    ┌───────▼───────┐
+                    │     Kafka     │
+                    │ Event Bus     │
+                    └───────────────┘
+```
+
+---
+
+## 핵심 구현
+
+### 1. 도메인별 서비스 분리
+
+Bounded Context를 기준으로 4개의 독립적인 마이크로서비스로 분리:
+
+```java
+// 상품 서비스 - Product Aggregate
+@Service
+public class ProductService {
+    private final ProductRepository productRepository;
+    private final ProductCacheService cacheService;
+    
+    public ProductDetailDto getProduct(Long productId) {
+        return cacheService.getOrLoad(
+            "product:" + productId,
+            () -> productRepository.findById(productId)
+                .map(ProductDetailDto::from)
+                .orElseThrow(() -> new ProductNotFoundException(productId))
+        );
+    }
+}
+```
+
+### 2. Redis 캐싱 레이어
+
+Hot data에 대한 캐싱 전략 구현:
+
+```java
+@Component
+public class ProductCacheService {
+    private final RedisTemplate<String, Object> redisTemplate;
+    private static final Duration CACHE_TTL = Duration.ofMinutes(30);
+    
+    public <T> T getOrLoad(String key, Supplier<T> loader) {
+        T cached = (T) redisTemplate.opsForValue().get(key);
+        if (cached != null) return cached;
+        
+        T value = loader.get();
+        redisTemplate.opsForValue().set(key, value, CACHE_TTL);
+        return value;
+    }
+}
+```
+
+### 3. 이벤트 기반 비동기 처리
+
+Kafka를 활용한 도메인 이벤트 발행/구독:
+
+```java
+@Component
+public class OrderEventPublisher {
+    private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
+    
+    @TransactionalEventListener(phase = AFTER_COMMIT)
+    public void publishOrderCreated(OrderCreatedEvent event) {
+        kafkaTemplate.send("order-events", event.getOrderId(), 
+            new OrderEvent("ORDER_CREATED", event));
+    }
+}
+```
+
+---
+
+## 트러블슈팅
+
+### 이슈 1: 분산 트랜잭션 정합성 문제
+
+**현상**: 주문-결제-재고 간 데이터 불일치 발생 (0.1% 주문)
+
+**원인**: 2PC 미적용 상태에서 네트워크 타임아웃 시 롤백 실패
+
+**해결**: Saga 패턴 도입 + 보상 트랜잭션 구현
+```java
+@SagaOrchestrator
+public class OrderSaga {
+    public void execute(OrderCommand cmd) {
+        try {
+            inventoryService.reserve(cmd.getItems());
+            paymentService.process(cmd.getPayment());
+            orderService.confirm(cmd.getOrderId());
+        } catch (Exception e) {
+            compensate(cmd); // 보상 트랜잭션 실행
+        }
+    }
+}
+```
+
+**재발 방지**: 모든 상태 변경에 대한 이벤트 소싱 적용, 정합성 체크 배치 잡 추가
+
+---
+
+### 이슈 2: Redis 캐시 스탬피드
+
+**현상**: 캐시 만료 시점에 DB 부하 급증 (CPU 90% 이상)
+
+**원인**: 인기 상품 캐시 동시 만료로 Thundering Herd 발생
+
+**해결**: 캐시 워밍 + 랜덤 TTL + 뮤텍스 락 적용
+```java
+public <T> T getWithLock(String key, Supplier<T> loader) {
+    T cached = get(key);
+    if (cached != null) return cached;
+    
+    String lockKey = "lock:" + key;
+    if (tryLock(lockKey, Duration.ofSeconds(5))) {
+        try {
+            return loadAndCache(key, loader);
+        } finally {
+            unlock(lockKey);
+        }
+    }
+    return waitAndGet(key); // 락 획득 실패 시 대기 후 재조회
+}
+```
+
+**재발 방지**: 모니터링 대시보드에 캐시 히트율 알림 추가
+
+---
+
+## 성과
+
+| 지표 | Before | After | 개선율 |
+|------|--------|-------|--------|
+| API 응답시간 (p99) | 200ms | 60ms | 70% ↓ |
+| 배포 소요시간 | 30분 | 5분 | 83% ↓ |
+| 시스템 가용성 | 99.5% | 99.95% | - |
+| 장애 복구시간(MTTR) | 45분 | 8분 | 82% ↓ |
+
+---
+
+## 프론트엔드 기여
+
+- **API 응답 포맷 표준화**: 프론트엔드 팀과 협업하여 일관된 응답 구조 설계
+- **WebSocket 실시간 알림**: 주문 상태 변경 실시간 Push 구현
+- **에러 핸들링 개선**: 사용자 친화적 에러 메시지 및 재시도 로직 협의
+
+---
+
+## 회고 및 다음 개선
+
+### 잘한 점
+- Strangler Fig 패턴으로 점진적 전환 → 서비스 중단 없이 마이그레이션
+- 충분한 부하 테스트로 예상치 못한 병목 사전 발견
+
+### 개선할 점
+- 초기 모니터링 체계 부족 → 다음 프로젝트에서는 Observability First 접근
+- 문서화 지연 → ADR(Architecture Decision Record) 도입 필요
+
+### 다음 개선 계획
+- Istio 서비스 메시 도입으로 트래픽 관리 고도화
+- OpenTelemetry 기반 분산 추적 시스템 구축

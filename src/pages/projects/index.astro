@@ -1,0 +1,117 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import TagFilter from '../../components/TagFilter.astro';
+
+// Get all published projects
+const allProjects = (await getCollection('projects', ({ data }) => !data.draft))
+  .sort((a, b) => a.data.order - b.data.order);
+
+// Extract unique tags from stack
+const allTags = [...new Set(allProjects.flatMap((p) => p.data.stack))];
+
+// Get filter from URL
+const url = Astro.url;
+const currentTag = url.searchParams.get('tag') || undefined;
+
+// Filter projects if tag is selected
+const projects = currentTag
+  ? allProjects.filter((p) => p.data.stack.includes(currentTag))
+  : allProjects;
+---
+
+<BaseLayout 
+  title="프로젝트"
+  description="주요 프로젝트 목록입니다. 백엔드 아키텍처, 인프라 자동화, 성능 최적화 등의 경험을 확인하세요."
+>
+  <section class="section">
+    <div class="container">
+      <header class="page-header">
+        <h1 class="page-title">프로젝트</h1>
+        <p class="page-desc">
+          문제 해결 과정과 성과를 중심으로 정리한 프로젝트입니다.
+        </p>
+      </header>
+
+      <TagFilter 
+        tags={allTags} 
+        basePath="/projects" 
+        currentTag={currentTag}
+      />
+
+      {projects.length > 0 ? (
+        <div class="projects-grid">
+          {projects.map((project) => (
+            <ProjectCard
+              title={project.data.title}
+              slug={project.slug}
+              period={project.data.period}
+              role={project.data.role}
+              stack={project.data.stack}
+              highlights={project.data.highlights}
+              metrics={project.data.metrics}
+              cover={project.data.cover}
+            />
+          ))}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <p>해당 기술 스택의 프로젝트가 없습니다.</p>
+          <a href="/projects">전체 프로젝트 보기</a>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .section {
+    padding: var(--space-12) 0 var(--space-20);
+  }
+
+  .page-header {
+    margin-bottom: var(--space-8);
+  }
+
+  .page-title {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    margin-bottom: var(--space-4);
+  }
+
+  .page-desc {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-16) 0;
+    color: var(--color-text-muted);
+  }
+
+  .empty-state a {
+    color: var(--color-accent);
+    text-decoration: none;
+    margin-top: var(--space-4);
+    display: inline-block;
+  }
+
+  .empty-state a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .projects-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

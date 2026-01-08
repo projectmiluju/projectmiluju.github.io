@@ -1,0 +1,257 @@
+---
+import { siteConfig } from '../config/site';
+
+const navLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/about', label: 'About' },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="header">
+  <nav class="nav container" aria-label="메인 내비게이션">
+    <a href="/" class="logo" aria-label="홈으로 이동">
+      <span class="logo-text">{siteConfig.name}</span>
+    </a>
+
+    <button 
+      class="mobile-menu-btn" 
+      aria-label="메뉴 열기"
+      aria-expanded="false"
+      aria-controls="nav-menu"
+    >
+      <span class="hamburger"></span>
+    </button>
+
+    <ul id="nav-menu" class="nav-links" role="menubar">
+      {navLinks.map(({ href, label }) => (
+        <li role="none">
+          <a 
+            href={href} 
+            class:list={['nav-link', { active: currentPath === href || (href !== '/' && currentPath.startsWith(href)) }]}
+            role="menuitem"
+            aria-current={currentPath === href ? 'page' : undefined}
+          >
+            {label}
+          </a>
+        </li>
+      ))}
+    </ul>
+
+    <a 
+      href={siteConfig.links.github} 
+      class="github-link"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="GitHub 프로필 (새 탭에서 열림)"
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+      </svg>
+    </a>
+  </nav>
+</header>
+
+<script>
+  const menuBtn = document.querySelector('.mobile-menu-btn');
+  const navLinks = document.querySelector('.nav-links');
+
+  menuBtn?.addEventListener('click', () => {
+    const isExpanded = menuBtn.getAttribute('aria-expanded') === 'true';
+    menuBtn.setAttribute('aria-expanded', (!isExpanded).toString());
+    navLinks?.classList.toggle('open');
+    menuBtn.setAttribute('aria-label', isExpanded ? '메뉴 열기' : '메뉴 닫기');
+  });
+
+  // Close menu on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+      navLinks.classList.remove('open');
+      menuBtn?.setAttribute('aria-expanded', 'false');
+      menuBtn?.setAttribute('aria-label', '메뉴 열기');
+    }
+  });
+</script>
+
+<style>
+  .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    background-color: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    z-index: 50;
+    backdrop-filter: blur(8px);
+    background-color: rgba(250, 250, 250, 0.9);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .header {
+      background-color: rgba(15, 15, 15, 0.9);
+    }
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    gap: var(--space-8);
+  }
+
+  .logo {
+    font-weight: 700;
+    font-size: var(--text-lg);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: opacity var(--transition-fast);
+  }
+
+  .logo:hover {
+    opacity: 0.8;
+  }
+
+  .logo-text {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nav-link {
+    display: block;
+    padding: var(--space-2) var(--space-4);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+  }
+
+  .nav-link:hover {
+    color: var(--color-text);
+    background-color: var(--color-accent-light);
+  }
+
+  .nav-link.active {
+    color: var(--color-accent);
+    background-color: var(--color-accent-light);
+  }
+
+  .github-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    color: var(--color-text-muted);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+  }
+
+  .github-link:hover {
+    color: var(--color-text);
+    background-color: var(--color-accent-light);
+  }
+
+  .mobile-menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .hamburger,
+  .hamburger::before,
+  .hamburger::after {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background-color: var(--color-text);
+    border-radius: 1px;
+    transition: all var(--transition-fast);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .hamburger {
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .hamburger::before {
+    content: '';
+    top: -6px;
+  }
+
+  .hamburger::after {
+    content: '';
+    top: 6px;
+  }
+
+  .mobile-menu-btn[aria-expanded="true"] .hamburger {
+    background-color: transparent;
+  }
+
+  .mobile-menu-btn[aria-expanded="true"] .hamburger::before {
+    top: 0;
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .mobile-menu-btn[aria-expanded="true"] .hamburger::after {
+    top: 0;
+    transform: translateX(-50%) rotate(-45deg);
+  }
+
+  @media (max-width: 768px) {
+    .mobile-menu-btn {
+      display: block;
+    }
+
+    .nav-links {
+      display: none;
+      position: absolute;
+      top: var(--header-height);
+      left: 0;
+      right: 0;
+      flex-direction: column;
+      background-color: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-4);
+      gap: var(--space-2);
+    }
+
+    .nav-links.open {
+      display: flex;
+    }
+
+    .nav-link {
+      width: 100%;
+      padding: var(--space-3) var(--space-4);
+    }
+
+    .github-link {
+      display: none;
+    }
+  }
+</style>

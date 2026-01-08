@@ -1,0 +1,248 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import BlogCard from '../components/BlogCard.astro';
+import StrengthCard from '../components/StrengthCard.astro';
+import { siteConfig } from '../config/site';
+
+// Get published projects sorted by order
+const projects = (await getCollection('projects', ({ data }) => !data.draft))
+  .sort((a, b) => a.data.order - b.data.order)
+  .slice(0, 3);
+
+// Get latest published blog posts
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+---
+
+<BaseLayout>
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content animate-slide-up">
+        <h1 class="hero-title">
+          안녕하세요,<br />
+          <span class="highlight">Backend/Infra</span> 중심<br />
+          풀스택 엔지니어입니다.
+        </h1>
+        <p class="hero-desc">
+          신뢰성 있는 시스템 설계, 성능 최적화, 자동화된 인프라 구축을 추구합니다.<br />
+          복잡한 문제를 단순하게 해결하는 것을 좋아합니다.
+        </p>
+        <div class="hero-actions">
+          <a href="/projects" class="btn btn-primary">프로젝트 보기</a>
+          <a href="/about" class="btn btn-secondary">소개</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Strengths Section -->
+  <section class="section strengths">
+    <div class="container">
+      <h2 class="section-title">핵심 역량</h2>
+      <div class="strengths-grid">
+        {siteConfig.strengths.map((strength) => (
+          <StrengthCard {...strength} />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Projects -->
+  <section class="section projects">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">주요 프로젝트</h2>
+        <a href="/projects" class="section-link">전체 보기 →</a>
+      </div>
+      <div class="projects-grid">
+        {projects.map((project) => (
+          <ProjectCard
+            title={project.data.title}
+            slug={project.slug}
+            period={project.data.period}
+            role={project.data.role}
+            stack={project.data.stack}
+            highlights={project.data.highlights}
+            metrics={project.data.metrics}
+            cover={project.data.cover}
+          />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Latest Blog Posts -->
+  <section class="section blog">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">최신 글</h2>
+        <a href="/blog" class="section-link">전체 보기 →</a>
+      </div>
+      <div class="blog-grid">
+        {posts.map((post) => (
+          <BlogCard
+            title={post.data.title}
+            slug={post.slug}
+            date={post.data.date}
+            summary={post.data.summary}
+            category={post.data.category}
+            tags={post.data.tags}
+          />
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  /* Hero Section */
+  .hero {
+    padding: var(--space-20) 0;
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+  }
+
+  .hero-content {
+    max-width: 640px;
+  }
+
+  .hero-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: var(--space-6);
+  }
+
+  .hero-title .highlight {
+    color: var(--color-accent);
+  }
+
+  .hero-desc {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    line-height: 1.7;
+    margin-bottom: var(--space-8);
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: var(--space-4);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--text-base);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-primary {
+    background-color: var(--color-accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-accent-hover);
+    color: white;
+  }
+
+  .btn-secondary {
+    background-color: var(--color-bg-alt);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  /* Section Styles */
+  .section {
+    padding: var(--space-16) 0;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-8);
+  }
+
+  .section-title {
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .section-link {
+    font-size: var(--text-sm);
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  .section-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Strengths Grid */
+  .strengths {
+    background-color: var(--color-bg);
+  }
+
+  .strengths .section-title {
+    text-align: center;
+    margin-bottom: var(--space-10);
+  }
+
+  .strengths-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-6);
+  }
+
+  /* Projects Grid */
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: var(--space-6);
+  }
+
+  /* Blog Grid */
+  .blog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-6);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero {
+      padding: var(--space-12) 0;
+      min-height: auto;
+    }
+
+    .hero-actions {
+      flex-direction: column;
+    }
+
+    .strengths-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .projects-grid,
+    .blog-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

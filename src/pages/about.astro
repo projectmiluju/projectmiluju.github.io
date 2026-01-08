@@ -1,0 +1,274 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { siteConfig } from '../config/site';
+---
+
+<BaseLayout 
+  title="About"
+  description="백엔드/인프라 중심의 풀스택 엔지니어. 신뢰성, 성능, 자동화를 추구합니다."
+>
+  <section class="section">
+    <div class="container">
+      <div class="about-content">
+        <header class="about-header">
+          <h1 class="about-title">About Me</h1>
+          <p class="about-subtitle">백엔드/인프라 중심 풀스택 엔지니어</p>
+        </header>
+
+        <div class="about-body">
+          <section class="about-section">
+            <h2>소개</h2>
+            <p>
+              안녕하세요. 저는 <strong>신뢰성 있는 시스템</strong>을 설계하고 구축하는 것을 좋아하는 엔지니어입니다.
+              복잡한 문제를 단순하게 해결하고, 자동화를 통해 팀의 생산성을 높이는 일에 관심이 많습니다.
+            </p>
+            <p>
+              백엔드와 인프라를 중심으로 경험을 쌓았지만, 프론트엔드까지 아우르는 풀스택 역량을 갖추고 있습니다.
+              사용자에게 가치를 전달하는 전체 과정을 이해하고 기여할 수 있는 엔지니어를 지향합니다.
+            </p>
+          </section>
+
+          <section class="about-section">
+            <h2>기술 스택</h2>
+            <div class="skill-groups">
+              <div class="skill-group">
+                <h3>Backend</h3>
+                <ul class="skill-list">
+                  <li>Java, Spring Boot, JPA</li>
+                  <li>Node.js, TypeScript</li>
+                  <li>Python, FastAPI</li>
+                </ul>
+              </div>
+              <div class="skill-group">
+                <h3>Infrastructure</h3>
+                <ul class="skill-list">
+                  <li>AWS (EC2, RDS, ECS, Lambda)</li>
+                  <li>Kubernetes, Docker</li>
+                  <li>Terraform, ArgoCD</li>
+                </ul>
+              </div>
+              <div class="skill-group">
+                <h3>Database</h3>
+                <ul class="skill-list">
+                  <li>PostgreSQL, MySQL</li>
+                  <li>Redis, MongoDB</li>
+                  <li>Elasticsearch</li>
+                </ul>
+              </div>
+              <div class="skill-group">
+                <h3>Frontend</h3>
+                <ul class="skill-list">
+                  <li>React, Next.js</li>
+                  <li>TypeScript</li>
+                  <li>HTML, CSS</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="about-section">
+            <h2>가치관</h2>
+            <ul class="value-list">
+              <li>
+                <strong>단순함을 추구합니다</strong>
+                <p>복잡한 문제를 단순하게 해결하는 것이 좋은 엔지니어링이라고 믿습니다.</p>
+              </li>
+              <li>
+                <strong>데이터로 판단합니다</strong>
+                <p>감보다는 측정과 분석을 통해 의사결정합니다.</p>
+              </li>
+              <li>
+                <strong>자동화를 사랑합니다</strong>
+                <p>반복 작업을 줄이고 사람은 창의적인 일에 집중해야 한다고 생각합니다.</p>
+              </li>
+              <li>
+                <strong>함께 성장합니다</strong>
+                <p>지식을 공유하고 팀 전체가 발전하는 환경을 만들어갑니다.</p>
+              </li>
+            </ul>
+          </section>
+
+          <section class="about-section">
+            <h2>일하는 방식</h2>
+            <ul class="work-style">
+              <li>문제의 본질을 먼저 파악하고, 가장 효과적인 해결책을 찾습니다.</li>
+              <li>코드 리뷰를 통해 지식을 공유하고 품질을 높입니다.</li>
+              <li>문서화와 기록을 중요하게 생각합니다.</li>
+              <li>작은 단위로 자주 배포하고, 빠르게 피드백을 반영합니다.</li>
+            </ul>
+          </section>
+
+          <section class="about-section">
+            <h2>연락처</h2>
+            <ul class="contact-list">
+              <li>
+                <strong>GitHub</strong>
+                <a href={siteConfig.links.github} target="_blank" rel="noopener noreferrer">
+                  {siteConfig.links.github}
+                </a>
+              </li>
+              <li>
+                <strong>Email</strong>
+                <a href={`mailto:${siteConfig.author.email}`}>
+                  {siteConfig.author.email}
+                </a>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .section {
+    padding: var(--space-12) 0 var(--space-20);
+  }
+
+  .about-content {
+    max-width: var(--content-width);
+  }
+
+  .about-header {
+    margin-bottom: var(--space-10);
+  }
+
+  .about-title {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+  }
+
+  .about-subtitle {
+    font-size: var(--text-xl);
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  .about-section {
+    margin-bottom: var(--space-10);
+  }
+
+  .about-section h2 {
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .about-section h3 {
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--color-accent);
+    margin-bottom: var(--space-2);
+  }
+
+  .about-section p {
+    color: var(--color-text);
+    line-height: 1.8;
+  }
+
+  /* Skill Groups */
+  .skill-groups {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+  }
+
+  .skill-group {
+    padding: var(--space-4);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .skill-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .skill-list li {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    padding: var(--space-1) 0;
+  }
+
+  /* Value List */
+  .value-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .value-list li {
+    margin-bottom: var(--space-4);
+    padding-left: var(--space-4);
+    border-left: 3px solid var(--color-accent);
+  }
+
+  .value-list li strong {
+    display: block;
+    font-size: var(--text-base);
+    color: var(--color-text);
+    margin-bottom: var(--space-1);
+  }
+
+  .value-list li p {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  /* Work Style */
+  .work-style {
+    padding-left: var(--space-6);
+  }
+
+  .work-style li {
+    color: var(--color-text);
+    margin-bottom: var(--space-2);
+    line-height: 1.6;
+  }
+
+  /* Contact List */
+  .contact-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .contact-list li {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .contact-list li:last-child {
+    border-bottom: none;
+  }
+
+  .contact-list strong {
+    min-width: 80px;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .contact-list a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  .contact-list a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .skill-groups {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

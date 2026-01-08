@@ -1,0 +1,290 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects');
+  return projects.map((project) => ({
+    params: { slug: project.slug },
+    props: { project },
+  }));
+}
+
+interface Props {
+  project: CollectionEntry<'projects'>;
+}
+
+const { project } = Astro.props;
+const { Content, headings } = await project.render();
+
+const { title, period, role, stack, links, highlights, metrics, cover } = project.data;
+---
+
+<BaseLayout
+  title={title}
+  description={`${role} | ${highlights?.[0] || ''}`}
+  ogImage={cover}
+  ogType="article"
+>
+  <article class="project-detail">
+    <div class="container">
+      <!-- Header -->
+      <header class="project-header">
+        <a href="/projects" class="back-link">← 프로젝트 목록</a>
+        
+        <h1 class="project-title">{title}</h1>
+        
+        <div class="project-meta">
+          <span class="meta-item">
+            <strong>기간</strong>
+            {period}
+          </span>
+          <span class="meta-item">
+            <strong>역할</strong>
+            {role}
+          </span>
+        </div>
+
+        <div class="project-stack">
+          {stack.map((tech) => (
+            <span class="stack-tag">{tech}</span>
+          ))}
+        </div>
+
+        {links && (
+          <div class="project-links">
+            {links.github && (
+              <a href={links.github} target="_blank" rel="noopener noreferrer" class="project-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                GitHub
+              </a>
+            )}
+            {links.demo && (
+              <a href={links.demo} target="_blank" rel="noopener noreferrer" class="project-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Demo
+              </a>
+            )}
+          </div>
+        )}
+
+        {metrics && metrics.length > 0 && (
+          <div class="metrics-section">
+            <h2 class="metrics-title">주요 성과</h2>
+            <ul class="metrics-list">
+              {metrics.map((metric) => (
+                <li class="metric-item">{metric}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </header>
+
+      <!-- Content -->
+      <div class="project-layout">
+        <aside class="project-sidebar">
+          <TableOfContents headings={headings} />
+        </aside>
+
+        <div class="project-content prose">
+          <Content />
+        </div>
+      </div>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .project-detail {
+    padding: var(--space-8) 0 var(--space-20);
+  }
+
+  .back-link {
+    display: inline-block;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    margin-bottom: var(--space-6);
+    transition: color var(--transition-fast);
+  }
+
+  .back-link:hover {
+    color: var(--color-accent);
+  }
+
+  .project-header {
+    max-width: var(--content-width);
+    margin-bottom: var(--space-10);
+  }
+
+  .project-title {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    margin-bottom: var(--space-4);
+    line-height: 1.2;
+  }
+
+  .project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-6);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-base);
+    color: var(--color-text-muted);
+  }
+
+  .meta-item strong {
+    color: var(--color-text);
+    margin-right: var(--space-2);
+  }
+
+  .project-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .stack-tag {
+    font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-3);
+    background-color: var(--color-code-bg);
+    color: var(--color-text);
+    border-radius: var(--radius-sm);
+  }
+
+  .project-links {
+    display: flex;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+
+  .project-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--color-text);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .project-link:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .metrics-section {
+    padding: var(--space-5);
+    background-color: var(--color-accent-light);
+    border-radius: var(--radius-lg);
+    margin-top: var(--space-6);
+  }
+
+  .metrics-title {
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--color-accent);
+    margin-bottom: var(--space-3);
+  }
+
+  .metrics-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .metric-item {
+    font-size: var(--text-sm);
+    color: var(--color-text);
+    padding: var(--space-1) 0;
+    padding-left: var(--space-4);
+    position: relative;
+  }
+
+  .metric-item::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+    font-weight: bold;
+  }
+
+  /* Layout */
+  .project-layout {
+    display: grid;
+    grid-template-columns: 1fr var(--sidebar-width);
+    gap: var(--space-10);
+    align-items: start;
+  }
+
+  .project-sidebar {
+    order: 2;
+  }
+
+  .project-content {
+    order: 1;
+    max-width: var(--content-width);
+  }
+
+  /* Prose Styles */
+  .prose h2 {
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    margin-top: var(--space-10);
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .prose h3 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    margin-top: var(--space-8);
+    margin-bottom: var(--space-3);
+  }
+
+  .prose p {
+    margin-bottom: var(--space-4);
+  }
+
+  .prose ul, .prose ol {
+    margin-bottom: var(--space-4);
+  }
+
+  .prose img {
+    border-radius: var(--radius-md);
+    margin: var(--space-6) 0;
+  }
+
+  @media (max-width: 1024px) {
+    .project-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .project-sidebar {
+      display: none;
+    }
+
+    .project-content {
+      max-width: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .project-title {
+      font-size: var(--text-3xl);
+    }
+  }
+</style>

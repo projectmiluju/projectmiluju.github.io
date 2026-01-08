@@ -1,0 +1,339 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlogCard from '../../components/BlogCard.astro';
+import { siteConfig } from '../../config/site';
+
+// Get all published posts
+const allPosts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+// Extract unique tags
+const allTags = [...new Set(allPosts.flatMap((p) => p.data.tags))];
+
+// Get filters from URL
+const url = Astro.url;
+const currentTag = url.searchParams.get('tag') || undefined;
+const currentCategory = url.searchParams.get('category') || undefined;
+const searchQuery = url.searchParams.get('q') || undefined;
+
+// Filter posts
+let posts = allPosts;
+
+if (currentCategory) {
+  posts = posts.filter((p) => p.data.category === currentCategory);
+}
+
+if (currentTag) {
+  posts = posts.filter((p) => p.data.tags.includes(currentTag));
+}
+
+if (searchQuery) {
+  const query = searchQuery.toLowerCase();
+  posts = posts.filter((p) => 
+    p.data.title.toLowerCase().includes(query) ||
+    p.data.summary.toLowerCase().includes(query) ||
+    p.data.tags.some((t) => t.toLowerCase().includes(query))
+  );
+}
+---
+
+<BaseLayout 
+  title="블로그"
+  description="CS 개념 정리, 개발 서적 리뷰, 트러블슈팅 경험을 기록합니다."
+>
+  <section class="section">
+    <div class="container">
+      <header class="page-header">
+        <h1 class="page-title">블로그</h1>
+        <p class="page-desc">
+          CS 개념 정리, 개발 서적 리뷰, 트러블슈팅 경험을 기록합니다.
+        </p>
+      </header>
+
+      <!-- Search -->
+      <div class="search-box">
+        <form action="/blog" method="get" class="search-form">
+          <input 
+            type="search" 
+            name="q" 
+            placeholder="검색어를 입력하세요..."
+            value={searchQuery || ''}
+            class="search-input"
+          />
+          <button type="submit" class="search-btn" aria-label="검색">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <!-- Category Filter -->
+      <div class="category-filter">
+        <a 
+          href="/blog" 
+          class:list={['category-btn', { active: !currentCategory }]}
+        >
+          전체
+        </a>
+        {siteConfig.blogCategories.map((cat) => (
+          <a 
+            href={`/blog?category=${cat.slug}`}
+            class:list={['category-btn', { active: currentCategory === cat.slug }]}
+          >
+            {cat.name}
+          </a>
+        ))}
+      </div>
+
+      <!-- Tag Filter -->
+      {allTags.length > 0 && (
+        <div class="tag-filter">
+          <span class="filter-label">태그</span>
+          <div class="tag-list">
+            {currentTag && (
+              <a href="/blog" class="tag-item active">
+                {currentTag} ×
+              </a>
+            )}
+            {!currentTag && allTags.slice(0, 10).map((tag) => (
+              <a href={`/blog?tag=${encodeURIComponent(tag)}`} class="tag-item">
+                #{tag}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Active Filters Display -->
+      {(currentCategory || currentTag || searchQuery) && (
+        <div class="active-filters">
+          <span>필터 적용 중:</span>
+          {currentCategory && (
+            <span class="filter-badge">
+              카테고리: {siteConfig.blogCategories.find(c => c.slug === currentCategory)?.name}
+            </span>
+          )}
+          {currentTag && <span class="filter-badge">태그: {currentTag}</span>}
+          {searchQuery && <span class="filter-badge">검색: "{searchQuery}"</span>}
+          <a href="/blog" class="clear-all">모두 초기화</a>
+        </div>
+      )}
+
+      <!-- Posts Grid -->
+      {posts.length > 0 ? (
+        <div class="blog-grid">
+          {posts.map((post) => (
+            <BlogCard
+              title={post.data.title}
+              slug={post.slug}
+              date={post.data.date}
+              summary={post.data.summary}
+              category={post.data.category}
+              tags={post.data.tags}
+            />
+          ))}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <p>검색 결과가 없습니다.</p>
+          <a href="/blog">전체 글 보기</a>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .section {
+    padding: var(--space-12) 0 var(--space-20);
+  }
+
+  .page-header {
+    margin-bottom: var(--space-8);
+  }
+
+  .page-title {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    margin-bottom: var(--space-4);
+  }
+
+  .page-desc {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  /* Search */
+  .search-box {
+    margin-bottom: var(--space-6);
+  }
+
+  .search-form {
+    display: flex;
+    max-width: 400px;
+  }
+
+  .search-input {
+    flex: 1;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-base);
+    border: 1px solid var(--color-border);
+    border-right: none;
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+    background-color: var(--color-bg-alt);
+    color: var(--color-text);
+    outline: none;
+  }
+
+  .search-input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .search-btn {
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+
+  .search-btn:hover {
+    background-color: var(--color-accent-hover);
+  }
+
+  /* Category Filter */
+  .category-filter {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+  }
+
+  .category-btn {
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .category-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .category-btn.active {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+  }
+
+  /* Tag Filter */
+  .tag-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .tag-list {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .tag-item {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .tag-item:hover {
+    color: var(--color-accent);
+    background-color: var(--color-accent-light);
+  }
+
+  .tag-item.active {
+    background-color: var(--color-accent);
+    color: white;
+  }
+
+  /* Active Filters */
+  .active-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-accent-light);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+    font-size: var(--text-sm);
+  }
+
+  .filter-badge {
+    padding: var(--space-1) var(--space-2);
+    background-color: var(--color-bg-alt);
+    border-radius: var(--radius-sm);
+  }
+
+  .clear-all {
+    color: var(--color-accent);
+    text-decoration: none;
+    margin-left: auto;
+  }
+
+  .clear-all:hover {
+    text-decoration: underline;
+  }
+
+  /* Grid */
+  .blog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-16) 0;
+    color: var(--color-text-muted);
+  }
+
+  .empty-state a {
+    color: var(--color-accent);
+    text-decoration: none;
+    margin-top: var(--space-4);
+    display: inline-block;
+  }
+
+  @media (max-width: 768px) {
+    .blog-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .search-form {
+      max-width: none;
+    }
+  }
+</style>

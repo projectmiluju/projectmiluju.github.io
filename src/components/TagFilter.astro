@@ -1,0 +1,94 @@
+---
+interface Props {
+  tags: string[];
+  basePath: string;
+  currentTag?: string;
+}
+
+const { tags, basePath, currentTag } = Astro.props;
+
+const sortedTags = [...tags].sort();
+---
+
+<div class="tag-filter">
+  <div class="filter-header">
+    <span class="filter-label">필터</span>
+    {currentTag && (
+      <a href={basePath} class="clear-filter">초기화</a>
+    )}
+  </div>
+  
+  <div class="tag-list">
+    <a 
+      href={basePath} 
+      class:list={['tag-btn', { active: !currentTag }]}
+    >
+      전체
+    </a>
+    {sortedTags.map((tag) => (
+      <a 
+        href={`${basePath}?tag=${encodeURIComponent(tag)}`}
+        class:list={['tag-btn', { active: currentTag === tag }]}
+      >
+        {tag}
+      </a>
+    ))}
+  </div>
+</div>
+
+<style>
+  .tag-filter {
+    margin-bottom: var(--space-6);
+  }
+
+  .filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+  }
+
+  .filter-label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .clear-filter {
+    font-size: var(--text-sm);
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  .clear-filter:hover {
+    text-decoration: underline;
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .tag-btn {
+    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--color-bg-alt);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .tag-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .tag-btn.active {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+  }
+</style>
