@@ -1,0 +1,433 @@
+---
+title: "쓱관 - 실시간 화상 챌린지 플랫폼"
+period: "2022.08 - 2022.10"
+role: "Backend Developer"
+stack: ["Java", "Spring Boot", "WebRTC", "WebSocket", "Kakao OAuth", "MySQL", "Redis", "AWS", "GitHub Actions"]
+links:
+  github: "https://github.com/HH99-NearBy/HH99-NearBy-BE"
+highlights:
+  - "실시간 랭킹 시스템 설계 및 구현"
+  - "GitHub Actions 기반 CI/CD 파이프라인 구축"
+  - "챌린지 참가/취소 및 통계 그래프 API 개발"
+  - "AWS 인프라 배포 및 운영"
+metrics:
+  - "3명 팀 프로젝트 (백엔드 담당)"
+  - "6주간 기획 및 개발 완료"
+  - "실시간 화상 챌린지 서비스 구현"
+cover: "/images/projects/ssgwan-cover.png"
+order: 4
+---
+
+## 문제 정의
+
+바쁜 현대인들이 새로운 도전을 시작할 때 겪는 어려움:
+- 혼자서는 동기부여가 어렵고 지속하기 힘듦
+- 같이 도전할 사람을 찾기 어려움
+- 진행 상황을 확인하고 경쟁할 수 있는 시스템 부재
+
+**목표**: 실시간 화상으로 함께 챌린지를 수행하고, 랭킹 시스템으로 동기부여를 제공하는 플랫폼 개발
+
+## 역할과 범위
+
+**역할**: 백엔드 개발자  
+**범위**: 
+- 랭킹 페이지 API 설계 및 구현
+- CI/CD 파이프라인 구축 (GitHub Actions)
+- 챌린지 상세 모달 참가/취소 기능
+- 챌린지 통계 그래프 API 개발
+
+---
+
+## 서비스 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Frontend (React)                        │
+│              React + WebRTC + Socket.io Client               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               ▼               ▼
+┌─────────────────┐  ┌─────────────┐  ┌─────────────────┐
+│  REST API       │  │  WebSocket  │  │  WebRTC Signal  │
+│  (Spring Boot)  │  │  Server     │  │  Server         │
+└────────┬────────┘  └──────┬──────┘  └────────┬────────┘
+         │                  │                  │
+         ▼                  ▼                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Backend (Spring Boot)                     │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │ 챌린지   │  │  랭킹    │  │  회원    │  │  채팅    │    │
+│  │  API     │  │  API     │  │  API     │  │  API     │    │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+       ┌──────────┐    ┌──────────┐    ┌──────────┐
+       │  MySQL   │    │  Redis   │    │  AWS S3  │
+       │   (DB)   │    │ (Cache)  │    │ (파일)   │
+       └──────────┘    └──────────┘    └──────────┘
+```
+
+---
+
+## 핵심 구현
+
+### 1. 실시간 랭킹 시스템
+
+시간마다 자동 갱신되는 챌린지 랭킹 시스템 구현:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class RankingService {
+    
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ChallengeRepository challengeRepository;
+    
+    private static final String RANKING_KEY = "challenge:ranking";
+    
+    // 랭킹 조회 (Redis 캐싱)
+    public List<RankingResponse> getRanking(int limit) {
+        // 캐시에서 먼저 조회
+        List<RankingResponse> cached = getCachedRanking(limit);
+        if (cached != null) {
+            return cached;
+        }
+        
+        // DB에서 조회 후 캐싱
+        List<RankingResponse> ranking = calculateRanking(limit);
+        cacheRanking(ranking);
+        
+        return ranking;
+    }
+    
+    // 랭킹 계산 로직
+    private List<RankingResponse> calculateRanking(int limit) {
+        return challengeRepository.findTopRankers(limit).stream()
+            .map(result -> RankingResponse.builder()
+                .rank(result.getRank())
+                .userId(result.getUserId())
+                .nickname(result.getNickname())
+                .profileImage(result.getProfileImage())
+                .completedCount(result.getCompletedCount())
+                .totalScore(result.getTotalScore())
+                .build())
+            .toList();
+    }
+    
+    // 스케줄러로 매시간 랭킹 갱신
+    @Scheduled(cron = "0 0 * * * *")
+    public void refreshRanking() {
+        List<RankingResponse> ranking = calculateRanking(100);
+        cacheRanking(ranking);
+        log.info("Ranking refreshed at {}", LocalDateTime.now());
+    }
+}
+```
+
+### 2. 챌린지 참가/취소 기능
+
+동시성을 고려한 챌린지 참가/취소 로직:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class ChallengeParticipationService {
+    
+    private final ChallengeRepository challengeRepository;
+    private final ParticipantRepository participantRepository;
+    
+    @Transactional
+    public ParticipationResponse joinChallenge(Long challengeId, Long userId) {
+        Challenge challenge = challengeRepository.findByIdWithLock(challengeId)
+            .orElseThrow(() -> new ChallengeNotFoundException());
+        
+        // 참가 가능 여부 검증
+        validateJoinable(challenge, userId);
+        
+        // 참가자 추가
+        Participant participant = Participant.builder()
+            .challenge(challenge)
+            .userId(userId)
+            .joinedAt(LocalDateTime.now())
+            .status(ParticipantStatus.ACTIVE)
+            .build();
+        
+        participantRepository.save(participant);
+        challenge.incrementParticipantCount();
+        
+        return ParticipationResponse.success(challenge, participant);
+    }
+    
+    @Transactional
+    public void cancelParticipation(Long challengeId, Long userId) {
+        Participant participant = participantRepository
+            .findByChallengeIdAndUserId(challengeId, userId)
+            .orElseThrow(() -> new ParticipantNotFoundException());
+        
+        Challenge challenge = participant.getChallenge();
+        
+        // 취소 가능 여부 검증 (시작 전만 가능)
+        if (challenge.isStarted()) {
+            throw new CancellationNotAllowedException("이미 시작된 챌린지는 취소할 수 없습니다.");
+        }
+        
+        participant.cancel();
+        challenge.decrementParticipantCount();
+    }
+    
+    private void validateJoinable(Challenge challenge, Long userId) {
+        if (challenge.isFull()) {
+            throw new ChallengeFullException();
+        }
+        if (participantRepository.existsByChallengeIdAndUserId(challenge.getId(), userId)) {
+            throw new AlreadyJoinedException();
+        }
+        if (challenge.isEnded()) {
+            throw new ChallengeEndedException();
+        }
+    }
+}
+```
+
+### 3. 챌린지 통계 그래프 API
+
+사용자별 챌린지 달성률 및 통계 제공:
+
+```java
+@RestController
+@RequestMapping("/api/challenges/stats")
+@RequiredArgsConstructor
+public class ChallengeStatsController {
+    
+    private final ChallengeStatsService statsService;
+    
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<UserStatsResponse> getUserStats(@PathVariable Long userId) {
+        return ResponseEntity.ok(statsService.getUserStats(userId));
+    }
+    
+    @GetMapping("/user/{userId}/weekly")
+    public ResponseEntity<WeeklyStatsResponse> getWeeklyStats(
+        @PathVariable Long userId,
+        @RequestParam @DateTimeFormat(iso = ISO.DATE) LocalDate startDate
+    ) {
+        return ResponseEntity.ok(statsService.getWeeklyStats(userId, startDate));
+    }
+}
+
+@Service
+@RequiredArgsConstructor
+public class ChallengeStatsService {
+    
+    private final ParticipantRepository participantRepository;
+    
+    public UserStatsResponse getUserStats(Long userId) {
+        List<Participant> participations = participantRepository.findByUserId(userId);
+        
+        long totalChallenges = participations.size();
+        long completedChallenges = participations.stream()
+            .filter(p -> p.getStatus() == ParticipantStatus.COMPLETED)
+            .count();
+        
+        double completionRate = totalChallenges > 0 
+            ? (double) completedChallenges / totalChallenges * 100 
+            : 0;
+        
+        return UserStatsResponse.builder()
+            .totalChallenges(totalChallenges)
+            .completedChallenges(completedChallenges)
+            .completionRate(Math.round(completionRate * 10) / 10.0)
+            .currentStreak(calculateStreak(participations))
+            .build();
+    }
+    
+    public WeeklyStatsResponse getWeeklyStats(Long userId, LocalDate startDate) {
+        LocalDate endDate = startDate.plusDays(6);
+        
+        List<DailyStats> dailyStats = participantRepository
+            .findDailyStatsByUserIdAndDateRange(userId, startDate, endDate);
+        
+        // 7일간 데이터 채우기
+        Map<LocalDate, DailyStats> statsMap = dailyStats.stream()
+            .collect(Collectors.toMap(DailyStats::getDate, Function.identity()));
+        
+        List<DailyStats> filledStats = startDate.datesUntil(endDate.plusDays(1))
+            .map(date -> statsMap.getOrDefault(date, DailyStats.empty(date)))
+            .toList();
+        
+        return new WeeklyStatsResponse(filledStats);
+    }
+}
+```
+
+### 4. CI/CD 파이프라인
+
+GitHub Actions를 활용한 자동 배포 파이프라인:
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+    
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    
+    - name: Build with Gradle
+      run: ./gradlew build -x test
+    
+    - name: Make zip file
+      run: |
+        mkdir -p deploy
+        cp build/libs/*.jar deploy/
+        cp appspec.yml deploy/
+        cp -r scripts deploy/
+        zip -r deploy.zip deploy
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-northeast-2
+    
+    - name: Upload to S3
+      run: aws s3 cp deploy.zip s3://${{ secrets.S3_BUCKET }}/deploy.zip
+    
+    - name: Deploy with CodeDeploy
+      run: |
+        aws deploy create-deployment \
+          --application-name ssgwan-app \
+          --deployment-group-name ssgwan-deploy-group \
+          --s3-location bucket=${{ secrets.S3_BUCKET }},key=deploy.zip,bundleType=zip
+```
+
+---
+
+## 트러블슈팅
+
+### 이슈 1: 랭킹 조회 성능 저하
+
+**현상**: 랭킹 페이지 로딩 시 3초 이상 소요
+
+**원인**: 매 요청마다 전체 사용자의 챌린지 달성 현황을 집계
+
+**해결**: Redis 캐싱 + 스케줄러 기반 주기적 갱신
+
+```java
+// Redis Sorted Set을 활용한 랭킹 캐싱
+@Scheduled(cron = "0 0 * * * *")
+public void refreshRanking() {
+    ZSetOperations<String, String> zSetOps = redisTemplate.opsForZSet();
+    
+    // 기존 랭킹 삭제
+    redisTemplate.delete(RANKING_KEY);
+    
+    // 새 랭킹 계산 및 저장
+    List<UserScore> scores = calculateAllUserScores();
+    for (UserScore score : scores) {
+        zSetOps.add(RANKING_KEY, score.getUserId().toString(), score.getScore());
+    }
+    
+    // TTL 설정 (2시간)
+    redisTemplate.expire(RANKING_KEY, Duration.ofHours(2));
+}
+```
+
+**결과**: 랭킹 조회 응답 시간 3초 → 50ms로 개선
+
+---
+
+### 이슈 2: 챌린지 동시 참가 시 정원 초과
+
+**현상**: 동시에 여러 명이 참가 시 정원이 초과되는 문제
+
+**원인**: 참가 가능 여부 확인과 참가 처리 사이의 경쟁 조건
+
+**해결**: 비관적 락(Pessimistic Lock) 적용
+
+```java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT c FROM Challenge c WHERE c.id = :id")
+Optional<Challenge> findByIdWithLock(@Param("id") Long id);
+```
+
+**재발 방지**: 동시성이 필요한 모든 업데이트 로직에 락 적용
+
+---
+
+## 성과
+
+| 지표 | 결과 |
+|------|------|
+| 개발 기간 | 6주 (2022.08.26 - 2022.10.07) |
+| 팀 구성 | 3명 백엔드 개발자 |
+| 담당 역할 | 랭킹, CI/CD, 챌린지 참가/통계 |
+| 커밋 수 | 536 commits |
+
+---
+
+## 주요 기능
+
+- **소셜 로그인**: 카카오 OAuth 로그인
+- **실시간 화상채팅**: WebRTC 기반 화상 챌린지
+- **실시간 채팅**: WebSocket 기반 텍스트 채팅
+- **랭킹 시스템**: 시간별 자동 갱신되는 챌린지 랭킹
+- **챌린지 관리**: 생성, 참가, 취소, 통계 그래프
+
+---
+
+## 팀 구성
+
+| 이름 | 역할 | 담당 |
+|------|------|------|
+| 오명재 | Backend | 화상채팅, 챌린지 CRUD, 로그인/회원가입 |
+| **정원용** | **Backend** | **랭킹, CI/CD, 참가/취소, 챌린지 그래프** |
+| 노우열 | Backend | 마이페이지, 카카오 로그인, 검색, 실시간 채팅 |
+
+---
+
+## 기술적 기여
+
+- **랭킹 시스템**: Redis 캐싱 기반 실시간 랭킹 구현
+- **CI/CD**: GitHub Actions + AWS CodeDeploy 자동 배포 파이프라인
+- **챌린지 API**: 참가/취소 동시성 처리, 통계 그래프 API
+- **인프라**: AWS EC2, S3, CodeDeploy 배포 환경 구축
+
+---
+
+## 회고
+
+### 잘한 점
+- Redis 캐싱으로 랭킹 조회 성능 대폭 개선
+- CI/CD 파이프라인 구축으로 배포 자동화
+- 동시성 문제 해결 경험
+
+### 배운 점
+- 실시간 서비스에서의 캐싱 전략
+- GitHub Actions를 활용한 CI/CD
+- AWS 인프라 구성 및 배포 경험
+
+### 아쉬운 점
+- 테스트 코드 부족
+- 모니터링 시스템 미구축
