@@ -5,7 +5,7 @@ export const siteConfig = {
   url: 'https://projectmiluju.github.io',
   author: {
     name: 'projectmiluju',
-    email: 'your-email@example.com',
+    email: 'project.miluju@gmail.com',
     github: 'https://github.com/projectmiluju',
     linkedin: '',
   },
