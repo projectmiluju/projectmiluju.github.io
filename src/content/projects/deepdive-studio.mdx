@@ -1,0 +1,478 @@
+---
+title: "DeepDive Studio - 가구 쇼핑몰 플랫폼"
+period: "2025.06 - 2025.07"
+role: "Fullstack Developer (Backend Lead)"
+stack: ["React", "TypeScript", "Vite", "Spring Boot", "Java 17", "Spring Security", "JPA", "MySQL", "JWT", "Toss Payments", "AWS S3", "Swagger"]
+links:
+  github: "https://github.com/projectmiluju/shoppingmall-be"
+highlights:
+  - "토스페이먼츠 결제 시스템 연동 및 구현"
+  - "Spring Security + JWT 인증/인가 시스템 설계"
+  - "SMS/이메일 본인인증 시스템 구현"
+  - "관리자 대시보드 및 매출 통계 기능 개발"
+metrics:
+  - "6명 팀 프로젝트 (백엔드 총괄 + 결제 시스템 담당)"
+  - "2개월 기획 및 개발 완료"
+  - "회원/상품/주문/결제 전 기능 구현"
+cover: "/images/projects/deepdive-studio-cover.png"
+order: 3
+---
+
+## 문제 정의
+
+가구 판매 쇼핑몰 구축 시 필요한 핵심 요소:
+- 안정적인 결제 시스템과 주문 관리
+- 본인인증을 통한 회원 신뢰성 확보
+- 관리자가 매출과 주문 현황을 한눈에 파악할 수 있는 대시보드
+
+**목표**: 사용자 친화적인 쇼핑 경험과 관리자 편의성을 모두 갖춘 가구 쇼핑몰 플랫폼 개발
+
+## 역할과 범위
+
+**역할**: 풀스택 개발자 (백엔드 총괄 + 프론트엔드 결제 파트)  
+**범위**: 
+- 백엔드: Spring Boot API 설계/구현, 인증 시스템, 결제 연동, 통계 API
+- 프론트엔드: 토스페이먼츠 결제 플로우, 결제 UI 컴포넌트
+- 인프라: AWS S3 파일 업로드, 프로덕션 환경 설정
+
+---
+
+## 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 Frontend (React + Vite)                      │
+│   React 19 + TanStack Query + Zustand + Toss Payments SDK   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Backend (Spring Boot 3.4.5)                 │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
+│  │  Member  │  │ Product  │  │  Order   │  │ Payment  │    │
+│  │   API    │  │   API    │  │   API    │  │   API    │    │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │
+│       │             │             │             │           │
+│  ┌────┴─────────────┴─────────────┴─────────────┴────┐     │
+│  │              Spring Security + JWT                │     │
+│  └───────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+           │              │              │
+           ▼              ▼              ▼
+    ┌──────────┐   ┌──────────┐   ┌──────────┐
+    │  MySQL   │   │  AWS S3  │   │  외부 API │
+    │   (DB)   │   │ (파일)   │   │(SMS/결제) │
+    └──────────┘   └──────────┘   └──────────┘
+```
+
+### 레포지토리 구성
+
+| 서비스 | 기술 스택 | 역할 |
+|--------|----------|------|
+| [shoppingmall-be](https://github.com/projectmiluju/shoppingmall-be) | Spring Boot 3.4.5, Java 17 | REST API 서버 |
+| [shoppingmall-fe](https://github.com/projectmiluju/shoppingmall-fe) | React 19, Vite 7 | 프론트엔드 SPA |
+
+---
+
+## 핵심 구현
+
+### 1. 토스페이먼츠 결제 연동
+
+토스페이먼츠 SDK를 활용한 안전한 결제 플로우 구현:
+
+```typescript
+// 프론트엔드: 토스 결제 요청
+const requestPayment = async (orderData: OrderData) => {
+  const tossPayments = await loadTossPayments(CLIENT_KEY);
+  
+  await tossPayments.requestPayment('카드', {
+    amount: orderData.totalAmount,
+    orderId: orderData.orderId,
+    orderName: orderData.orderName,
+    customerName: orderData.customerName,
+    successUrl: `${window.location.origin}/payment/success`,
+    failUrl: `${window.location.origin}/payment/fail`,
+  });
+};
+
+// 결제 성공 콜백 처리
+const PaymentSuccess = () => {
+  const [searchParams] = useSearchParams();
+  const { mutate: confirmPayment } = useConfirmPayment();
+
+  useEffect(() => {
+    const paymentKey = searchParams.get('paymentKey');
+    const orderId = searchParams.get('orderId');
+    const amount = searchParams.get('amount');
+
+    if (paymentKey && orderId && amount) {
+      confirmPayment({ paymentKey, orderId, amount: Number(amount) });
+    }
+  }, []);
+};
+```
+
+```java
+// 백엔드: 결제 승인 처리
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+    
+    private final TossPaymentsClient tossClient;
+    private final OrderRepository orderRepository;
+    
+    @Transactional
+    public PaymentResponse confirmPayment(PaymentConfirmRequest request) {
+        // 1. 주문 정보 검증
+        Order order = orderRepository.findByOrderId(request.getOrderId())
+            .orElseThrow(() -> new OrderNotFoundException());
+        
+        validateAmount(order, request.getAmount());
+        
+        // 2. 토스 결제 승인 API 호출
+        TossPaymentResponse tossResponse = tossClient.confirmPayment(
+            request.getPaymentKey(),
+            request.getOrderId(),
+            request.getAmount()
+        );
+        
+        // 3. 결제 정보 저장 및 주문 상태 업데이트
+        Payment payment = Payment.builder()
+            .order(order)
+            .paymentKey(tossResponse.getPaymentKey())
+            .method(tossResponse.getMethod())
+            .status(PaymentStatus.COMPLETED)
+            .paidAt(LocalDateTime.now())
+            .build();
+        
+        order.updateStatus(OrderStatus.PAID);
+        paymentRepository.save(payment);
+        
+        return PaymentResponse.from(payment);
+    }
+}
+```
+
+### 2. JWT 인증 및 Spring Security
+
+토큰 기반 인증 시스템 구현:
+
+```java
+@Component
+@RequiredArgsConstructor
+public class JwtTokenProvider {
+    
+    @Value("${jwt.secret}")
+    private String secretKey;
+    
+    private static final long ACCESS_TOKEN_VALIDITY = 1000 * 60 * 30; // 30분
+    private static final long REFRESH_TOKEN_VALIDITY = 1000 * 60 * 60 * 24 * 14; // 14일
+    
+    public TokenDto generateTokenPair(Member member) {
+        String accessToken = createToken(member, ACCESS_TOKEN_VALIDITY);
+        String refreshToken = createToken(member, REFRESH_TOKEN_VALIDITY);
+        
+        return TokenDto.builder()
+            .accessToken(accessToken)
+            .refreshToken(refreshToken)
+            .build();
+    }
+    
+    private String createToken(Member member, long validity) {
+        Claims claims = Jwts.claims().setSubject(member.getEmail());
+        claims.put("role", member.getRole().name());
+        
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + validity);
+        
+        return Jwts.builder()
+            .setClaims(claims)
+            .setIssuedAt(now)
+            .setExpiration(expiration)
+            .signWith(SignatureAlgorithm.HS256, secretKey)
+            .compact();
+    }
+}
+
+// Security 설정
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+    
+    private final JwtAuthenticationFilter jwtFilter;
+    
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        return http
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> 
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**", "/api/products/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated())
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .build();
+    }
+}
+```
+
+### 3. SMS/이메일 본인인증
+
+Coolsms API와 Spring Mail을 활용한 본인인증:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class PhoneVerificationService {
+    
+    private final DefaultMessageService messageService;
+    private final RedisTemplate<String, String> redisTemplate;
+    
+    private static final int CODE_LENGTH = 6;
+    private static final long EXPIRATION_MINUTES = 5;
+    
+    public void sendVerificationCode(String phoneNumber) {
+        String code = generateCode();
+        
+        // Redis에 인증번호 저장 (5분 TTL)
+        String key = "phone:verify:" + phoneNumber;
+        redisTemplate.opsForValue().set(key, code, EXPIRATION_MINUTES, TimeUnit.MINUTES);
+        
+        // SMS 발송
+        Message message = new Message();
+        message.setFrom(senderNumber);
+        message.setTo(phoneNumber);
+        message.setText("[DeepDive Studio] 인증번호: " + code);
+        
+        messageService.sendOne(new SingleMessageSendingRequest(message));
+    }
+    
+    public boolean verifyCode(String phoneNumber, String inputCode) {
+        String key = "phone:verify:" + phoneNumber;
+        String savedCode = redisTemplate.opsForValue().get(key);
+        
+        if (savedCode != null && savedCode.equals(inputCode)) {
+            redisTemplate.delete(key);
+            return true;
+        }
+        return false;
+    }
+    
+    private String generateCode() {
+        return String.format("%06d", new Random().nextInt(1000000));
+    }
+}
+```
+
+### 4. 관리자 대시보드 통계
+
+시간별 매출 및 주문 통계 API:
+
+```java
+@RestController
+@RequestMapping("/api/admin/stats")
+@RequiredArgsConstructor
+public class StatsController {
+    
+    private final StatsService statsService;
+    
+    @GetMapping("/hourly")
+    public ResponseEntity<HourlyStatsResponse> getHourlyStats(
+        @RequestParam @DateTimeFormat(iso = ISO.DATE) LocalDate date
+    ) {
+        return ResponseEntity.ok(statsService.getHourlyStats(date));
+    }
+    
+    @GetMapping("/popular-products")
+    public ResponseEntity<List<PopularProductDto>> getPopularProducts(
+        @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(statsService.getPopularProducts(limit));
+    }
+}
+
+@Service
+@RequiredArgsConstructor
+public class StatsService {
+    
+    private final OrderRepository orderRepository;
+    
+    public HourlyStatsResponse getHourlyStats(LocalDate date) {
+        List<HourlyStat> stats = orderRepository.findHourlyStatsByDate(date);
+        
+        // 0~23시 데이터 채우기
+        Map<Integer, HourlyStat> statMap = stats.stream()
+            .collect(Collectors.toMap(HourlyStat::getHour, Function.identity()));
+        
+        List<HourlyStat> filledStats = IntStream.range(0, 24)
+            .mapToObj(hour -> statMap.getOrDefault(hour, HourlyStat.empty(hour)))
+            .toList();
+        
+        return new HourlyStatsResponse(filledStats, calculateDailySummary(stats));
+    }
+}
+```
+
+---
+
+## 트러블슈팅
+
+### 이슈 1: 토스 결제 금액 불일치 취약점
+
+**현상**: 클라이언트에서 전달한 금액과 서버 주문 금액이 다를 수 있는 보안 취약점
+
+**원인**: 결제 승인 시 클라이언트가 보낸 금액을 그대로 신뢰
+
+**해결**: 서버 사이드에서 주문 금액 재검증
+
+```java
+@Transactional
+public PaymentResponse confirmPayment(PaymentConfirmRequest request) {
+    Order order = orderRepository.findByOrderId(request.getOrderId())
+        .orElseThrow(OrderNotFoundException::new);
+    
+    // 서버에 저장된 주문 금액과 비교
+    if (!order.getTotalAmount().equals(request.getAmount())) {
+        throw new PaymentAmountMismatchException(
+            "요청 금액: " + request.getAmount() + 
+            ", 주문 금액: " + order.getTotalAmount()
+        );
+    }
+    
+    // 결제 승인 진행...
+}
+```
+
+**재발 방지**: 모든 금액 관련 로직은 서버에서 계산/검증
+
+---
+
+### 이슈 2: JWT 토큰 만료 시 UX 저하
+
+**현상**: Access Token 만료 시 사용자가 갑자기 로그아웃되어 불편
+
+**원인**: 토큰 갱신 로직 부재
+
+**해결**: Axios Interceptor를 활용한 자동 토큰 갱신
+
+```typescript
+// Axios 응답 인터셉터
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = getRefreshToken();
+        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+        
+        setAccessToken(data.accessToken);
+        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        // Refresh Token도 만료 시 로그아웃
+        logout();
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+```
+
+**결과**: 사용자는 토큰 만료를 인지하지 못하고 끊김 없이 서비스 이용
+
+---
+
+### 이슈 3: N+1 쿼리 성능 문제
+
+**현상**: 상품 목록 조회 시 카테고리, 이미지 정보를 개별 쿼리로 조회
+
+**원인**: JPA 기본 Lazy Loading으로 인한 추가 쿼리 발생
+
+**해결**: Fetch Join 및 @EntityGraph 적용
+
+```java
+@EntityGraph(attributePaths = {"category", "images", "options"})
+@Query("SELECT p FROM Product p WHERE p.status = 'ACTIVE'")
+List<Product> findAllActiveProductsWithDetails();
+
+// DTO Projection 활용
+@Query("""
+    SELECT new io.groom.scubadive.shoppingmall.product.dto.ProductListDto(
+        p.id, p.name, p.price, p.thumbnailUrl, c.name
+    )
+    FROM Product p
+    JOIN p.category c
+    WHERE p.status = 'ACTIVE'
+    ORDER BY p.createdAt DESC
+""")
+List<ProductListDto> findProductListDtos(Pageable pageable);
+```
+
+**결과**: 상품 목록 조회 쿼리 수 50+ → 3개로 감소
+
+---
+
+## 성과
+
+| 지표 | 결과 |
+|------|------|
+| 개발 기간 | 2개월 (기획 ~ 배포) |
+| 팀 구성 | 6명 |
+| 담당 역할 | 백엔드 총괄 + 결제 시스템 |
+| API 개수 | 50+ RESTful API |
+| 주요 기능 | 회원/상품/장바구니/주문/결제/통계 |
+
+---
+
+## 주요 기능
+
+- **사용자 인증**: 회원가입/로그인, SMS/이메일 본인인증, JWT 토큰 관리
+- **상품 관리**: 카테고리별 상품 조회, 상품 상세, 옵션/이미지 관리
+- **장바구니**: 상품 담기, 수량 변경, 삭제
+- **주문/결제**: 주문 생성, 토스페이먼츠 결제, 주문 내역 조회
+- **관리자**: 상품/주문/회원 관리, 매출 통계, 인기 상품 랭킹
+
+---
+
+## 기술적 기여
+
+### 백엔드
+- **API 설계**: RESTful API 50+ 엔드포인트 설계 및 구현
+- **인증 시스템**: Spring Security + JWT 기반 인증/인가
+- **결제 연동**: 토스페이먼츠 API 연동 및 결제 플로우 구현
+- **본인인증**: Coolsms, Spring Mail 연동
+- **파일 업로드**: AWS S3 연동
+- **API 문서화**: Swagger UI (springdoc-openapi)
+
+### 프론트엔드
+- **결제 UI**: 토스페이먼츠 SDK 연동, 결제 플로우 구현
+- **상태 관리**: TanStack Query를 활용한 서버 상태 관리
+
+---
+
+## 회고 및 다음 개선
+
+### 잘한 점
+- 토스페이먼츠 결제 시스템 안정적 구현
+- JWT 인증 시스템으로 보안성 확보
+- Swagger를 통한 API 문서화로 프론트엔드 협업 원활
+
+### 개선할 점
+- 테스트 코드 커버리지 확대 필요
+- 캐싱 전략 부재 (Redis 캐싱 도입 고려)
+- 에러 핸들링 고도화
+
+### 다음 개선 계획
+- Redis 캐싱으로 조회 성능 개선
+- 주문/결제 실패 시 보상 트랜잭션 구현
+- 실시간 재고 관리 시스템 도입
