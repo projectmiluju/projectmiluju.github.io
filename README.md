@@ -154,6 +154,8 @@ export const siteConfig = {
 2. Source를 **"GitHub Actions"**로 선택
 3. `main` 브랜치에 push하면 자동 배포됨
 
+**참고**: `public/.nojekyll` 파일이 포함되어 있어 GitHub Pages가 Jekyll 대신 정적 파일로 사이트를 서빙합니다.
+
 ### 수동 배포
 
 ```bash
