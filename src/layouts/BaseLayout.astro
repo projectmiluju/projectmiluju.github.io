@@ -70,6 +70,32 @@ const fullTitle = title === siteConfig.title ? title : `${title} | ${siteConfig.
   <!-- Theme Color -->
   <meta name="theme-color" content="#0066cc" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#4d9fff" media="(prefers-color-scheme: dark)" />
+
+  <!-- Theme Initialization Script (prevents flash of wrong theme) -->
+  <script is:inline>
+    (function() {
+      const STORAGE_KEY = 'theme-preference';
+      
+      function getThemePreference() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored === 'light' || stored === 'dark') {
+          return stored;
+        }
+        return 'system';
+      }
+      
+      function getEffectiveTheme(preference) {
+        if (preference === 'system') {
+          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        return preference;
+      }
+      
+      const preference = getThemePreference();
+      const effectiveTheme = getEffectiveTheme(preference);
+      document.documentElement.setAttribute('data-theme', effectiveTheme);
+    })();
+  </script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">본문으로 건너뛰기</a>

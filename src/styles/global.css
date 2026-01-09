@@ -64,9 +64,9 @@
   --radius-lg: 12px;
 }
 
-/* Dark mode */
+/* Dark mode - System preference */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-bg: #0f0f0f;
     --color-bg-alt: #1a1a1a;
     --color-text: #f5f5f5;
@@ -78,6 +78,34 @@
     --color-accent-light: #1a2e42;
     --color-code-bg: #1e1e1e;
   }
+}
+
+/* Dark mode - Manual override */
+[data-theme="dark"] {
+  --color-bg: #0f0f0f;
+  --color-bg-alt: #1a1a1a;
+  --color-text: #f5f5f5;
+  --color-text-muted: #a0a0a0;
+  --color-border: #2a2a2a;
+  --color-border-hover: #3a3a3a;
+  --color-accent: #4d9fff;
+  --color-accent-hover: #6db3ff;
+  --color-accent-light: #1a2e42;
+  --color-code-bg: #1e1e1e;
+}
+
+/* Light mode - Manual override (ensures light mode even with dark system preference) */
+[data-theme="light"] {
+  --color-bg: #fafafa;
+  --color-bg-alt: #ffffff;
+  --color-text: #1a1a1a;
+  --color-text-muted: #6b6b6b;
+  --color-border: #e5e5e5;
+  --color-border-hover: #d0d0d0;
+  --color-accent: #0066cc;
+  --color-accent-hover: #0052a3;
+  --color-accent-light: #e6f0fa;
+  --color-code-bg: #f5f5f5;
 }
 
 /* ===== Reset & Base ===== */

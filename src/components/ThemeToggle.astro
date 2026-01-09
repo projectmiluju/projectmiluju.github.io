@@ -1,0 +1,133 @@
+---
+// Theme Toggle Component
+---
+
+<button 
+  id="theme-toggle" 
+  class="theme-toggle"
+  aria-label="테마 전환"
+  title="테마 전환"
+>
+  <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="5"></circle>
+    <line x1="12" y1="1" x2="12" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="23"></line>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+    <line x1="1" y1="12" x2="3" y2="12"></line>
+    <line x1="21" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+  </svg>
+  <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  </svg>
+</button>
+
+<script>
+  // Theme initialization and toggle logic
+  const STORAGE_KEY = 'theme-preference';
+
+  // Get initial theme
+  function getThemePreference(): 'light' | 'dark' | 'system' {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+    return 'system';
+  }
+
+  // Get effective theme (resolves 'system' to actual light/dark)
+  function getEffectiveTheme(preference: 'light' | 'dark' | 'system'): 'light' | 'dark' {
+    if (preference === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return preference;
+  }
+
+  // Apply theme to document
+  function applyTheme(theme: 'light' | 'dark') {
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    // Update toggle button aria-label
+    const toggleBtn = document.getElementById('theme-toggle');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-label', theme === 'light' ? '다크 모드로 전환' : '라이트 모드로 전환');
+    }
+  }
+
+  // Initialize theme on page load
+  const preference = getThemePreference();
+  const effectiveTheme = getEffectiveTheme(preference);
+  applyTheme(effectiveTheme);
+
+  // Listen for system theme changes (only if user hasn't set a preference)
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  mediaQuery.addEventListener('change', (e) => {
+    const currentPreference = getThemePreference();
+    if (currentPreference === 'system') {
+      applyTheme(e.matches ? 'dark' : 'light');
+    }
+  });
+
+  // Toggle theme on button click
+  const toggleBtn = document.getElementById('theme-toggle');
+  toggleBtn?.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') as 'light' | 'dark';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    // Save preference to localStorage
+    localStorage.setItem(STORAGE_KEY, newTheme);
+    applyTheme(newTheme);
+  });
+</script>
+
+<style>
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+  }
+
+  .theme-toggle:hover {
+    color: var(--color-text);
+    background-color: var(--color-accent-light);
+  }
+
+  .theme-toggle svg {
+    position: absolute;
+    transition: all var(--transition-fast);
+  }
+
+  /* Light mode: show moon (dark mode option) */
+  [data-theme="light"] .theme-toggle .sun-icon {
+    opacity: 0;
+    transform: rotate(180deg) scale(0);
+  }
+
+  [data-theme="light"] .theme-toggle .moon-icon {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+
+  /* Dark mode: show sun (light mode option) */
+  [data-theme="dark"] .theme-toggle .sun-icon {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+
+  [data-theme="dark"] .theme-toggle .moon-icon {
+    opacity: 0;
+    transform: rotate(-180deg) scale(0);
+  }
+</style>
