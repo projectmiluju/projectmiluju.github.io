@@ -8,16 +8,26 @@ interface Props {
   highlights?: string[];
   metrics?: string[];
   cover?: string;
+  youtube?: string;
 }
 
-const { title, slug, period, role, stack, highlights = [], metrics = [], cover } = Astro.props;
+const { title, slug, period, role, stack, highlights = [], metrics = [], cover, youtube } = Astro.props;
+
+// 유튜브 비디오 ID에서 순수 ID만 추출 (쿼리 파라미터 제거)
+const getYouTubeId = (id?: string) => {
+  if (!id) return null;
+  return id.split('?')[0];
+};
+
+// 커버 이미지가 없으면 유튜브 썸네일 사용
+const displayCover = cover || (youtube ? `https://img.youtube.com/vi/${getYouTubeId(youtube)}/maxresdefault.jpg` : undefined);
 ---
 
 <article class="project-card">
   <a href={`/projects/${slug}`} class="card-link">
-    {cover && (
+    {displayCover && (
       <div class="card-cover">
-        <img src={cover} alt={`${title} 프로젝트 썸네일`} loading="lazy" />
+        <img src={displayCover} alt={`${title} 프로젝트 썸네일`} loading="lazy" />
       </div>
     )}
     
