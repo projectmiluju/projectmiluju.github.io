@@ -2,6 +2,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
+import YouTubeEmbed from '../../components/YouTubeEmbed.astro';
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects');
@@ -18,7 +19,7 @@ interface Props {
 const { project } = Astro.props;
 const { Content, headings } = await project.render();
 
-const { title, period, role, stack, links, highlights, metrics, cover } = project.data;
+const { title, period, role, stack, links, highlights, metrics, cover, youtube } = project.data;
 ---
 
 <BaseLayout
@@ -83,6 +84,13 @@ const { title, period, role, stack, links, highlights, metrics, cover } = projec
                 <li class="metric-item">{metric}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {youtube && (
+          <div class="video-section">
+            <h2 class="video-title">프로젝트 데모</h2>
+            <YouTubeEmbed videoId={youtube} title={`${title} 데모 영상`} />
           </div>
         )}
       </header>
@@ -219,6 +227,17 @@ const { title, period, role, stack, links, highlights, metrics, cover } = projec
     left: 0;
     color: var(--color-accent);
     font-weight: bold;
+  }
+
+  .video-section {
+    margin-top: var(--space-8);
+  }
+
+  .video-title {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    color: var(--color-text);
   }
 
   /* Layout */

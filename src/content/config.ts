@@ -28,6 +28,7 @@ const projectsCollection = defineCollection({
     highlights: z.array(z.string()).default([]),
     metrics: z.array(z.string()).default([]),
     cover: z.string().optional(),
+    youtube: z.string().optional(), // YouTube 비디오 ID
     draft: z.boolean().default(false),
     order: z.number().default(0),
   }),
