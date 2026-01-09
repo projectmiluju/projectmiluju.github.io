@@ -15,6 +15,7 @@ const allTags = [...new Set(allPosts.flatMap((p) => p.data.tags))];
 const url = Astro.url;
 const currentTag = url.searchParams.get('tag') || undefined;
 const currentCategory = url.searchParams.get('category') || undefined;
+const currentSeries = url.searchParams.get('series') || undefined;
 const searchQuery = url.searchParams.get('q') || undefined;
 
 // Filter posts
@@ -22,6 +23,10 @@ let posts = allPosts;
 
 if (currentCategory) {
   posts = posts.filter((p) => p.data.category === currentCategory);
+}
+
+if (currentSeries) {
+  posts = posts.filter((p) => p.data.series === currentSeries);
 }
 
 if (currentTag) {
@@ -36,6 +41,24 @@ if (searchQuery) {
     p.data.tags.some((t) => t.toLowerCase().includes(query))
   );
 }
+
+// Group posts by series for display when no filter is active
+const postsBySeries = allPosts.reduce((acc, post) => {
+  const series = post.data.series || '기타';
+  if (!acc[series]) {
+    acc[series] = [];
+  }
+  acc[series].push(post);
+  return acc;
+}, {} as Record<string, typeof allPosts>);
+
+// Get series info from config
+const getSeriesInfo = (seriesName: string) => {
+  return siteConfig.blogSeries.find(s => s.slug === seriesName);
+};
+
+// Check if showing grouped view (no filters applied)
+const showGroupedView = !currentCategory && !currentSeries && !currentTag && !searchQuery;
 ---
 
 <BaseLayout 
@@ -74,18 +97,38 @@ if (searchQuery) {
       <div class="category-filter">
         <a 
           href="/blog" 
-          class:list={['category-btn', { active: !currentCategory }]}
+          class:list={['category-btn', { active: !currentCategory && !currentSeries }]}
         >
           전체
         </a>
         {siteConfig.blogCategories.map((cat) => (
           <a 
             href={`/blog?category=${cat.slug}`}
-            class:list={['category-btn', { active: currentCategory === cat.slug }]}
+            class:list={['category-btn', { active: currentCategory === cat.slug && !currentSeries }]}
           >
             {cat.name}
           </a>
         ))}
+      </div>
+
+      <!-- Series Filter (Sub-categories) -->
+      <div class="series-filter">
+        <span class="filter-label">시리즈</span>
+        <div class="series-list">
+          {siteConfig.blogSeries.map((series) => (
+            <a 
+              href={`/blog?series=${encodeURIComponent(series.slug)}`}
+              class:list={['series-btn', { active: currentSeries === series.slug }]}
+              data-category={series.category}
+            >
+              <span class="series-icon">{series.icon}</span>
+              <span class="series-name">{series.name}</span>
+              <span class="series-count">
+                {postsBySeries[series.slug]?.length || 0}
+              </span>
+            </a>
+          ))}
+        </div>
       </div>
 
       <!-- Tag Filter -->
@@ -108,12 +151,17 @@ if (searchQuery) {
       )}
 
       <!-- Active Filters Display -->
-      {(currentCategory || currentTag || searchQuery) && (
+      {(currentCategory || currentSeries || currentTag || searchQuery) && (
         <div class="active-filters">
           <span>필터 적용 중:</span>
           {currentCategory && (
             <span class="filter-badge">
               카테고리: {siteConfig.blogCategories.find(c => c.slug === currentCategory)?.name}
+            </span>
+          )}
+          {currentSeries && (
+            <span class="filter-badge">
+              시리즈: {currentSeries}
             </span>
           )}
           {currentTag && <span class="filter-badge">태그: {currentTag}</span>}
@@ -122,8 +170,51 @@ if (searchQuery) {
         </div>
       )}
 
-      <!-- Posts Grid -->
-      {posts.length > 0 ? (
+      {/* Posts Display */}
+      {showGroupedView ? (
+        <div class="series-sections">
+          {Object.entries(postsBySeries)
+            .sort(([a], [b]) => {
+              const aIndex = siteConfig.blogSeries.findIndex(s => s.slug === a);
+              const bIndex = siteConfig.blogSeries.findIndex(s => s.slug === b);
+              if (aIndex === -1 && bIndex === -1) return 0;
+              if (aIndex === -1) return 1;
+              if (bIndex === -1) return -1;
+              return aIndex - bIndex;
+            })
+            .map(([seriesName, seriesPosts]) => {
+              const seriesInfo = getSeriesInfo(seriesName);
+              return (
+                <section class="series-section" data-category={seriesInfo?.category}>
+                  <div class="series-header">
+                    <h2 class="series-title">
+                      {seriesInfo?.icon && <span class="series-icon">{seriesInfo.icon}</span>}
+                      {seriesName}
+                    </h2>
+                    <span class="series-meta">
+                      <span class="post-count">{seriesPosts.length}개의 글</span>
+                      <a href={`/blog?series=${encodeURIComponent(seriesName)}`} class="view-all">
+                        전체 보기 →
+                      </a>
+                    </span>
+                  </div>
+                  <div class="series-posts">
+                    {seriesPosts.slice(0, 4).map((post) => (
+                      <BlogCard
+                        title={post.data.title}
+                        slug={post.slug}
+                        date={post.data.date}
+                        summary={post.data.summary}
+                        category={post.data.category}
+                        tags={post.data.tags}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+        </div>
+      ) : posts.length > 0 ? (
         <div class="blog-grid">
           {posts.map((post) => (
             <BlogCard
@@ -238,6 +329,74 @@ if (searchQuery) {
     color: white;
   }
 
+  /* Series Filter */
+  .series-filter {
+    margin-bottom: var(--space-6);
+  }
+
+  .filter-label {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+
+  .series-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .series-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: var(--color-text);
+    transition: all var(--transition-fast);
+  }
+
+  .series-btn:hover {
+    border-color: var(--color-accent);
+    transform: translateY(-1px);
+  }
+
+  .series-btn.active {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent-light);
+  }
+
+  .series-btn[data-category="cs"] .series-icon {
+    color: #0369a1;
+  }
+
+  .series-btn[data-category="book"] .series-icon {
+    color: #b45309;
+  }
+
+  .series-btn .series-icon {
+    font-size: var(--text-lg);
+  }
+
+  .series-btn .series-name {
+    flex: 1;
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .series-btn .series-count {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    background-color: var(--color-bg);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+  }
+
   /* Tag Filter */
   .tag-filter {
     display: flex;
@@ -247,10 +406,9 @@ if (searchQuery) {
     flex-wrap: wrap;
   }
 
-  .filter-label {
-    font-size: var(--text-sm);
-    font-weight: 500;
-    color: var(--color-text-muted);
+  .tag-filter .filter-label {
+    display: inline;
+    margin-bottom: 0;
   }
 
   .tag-list {
@@ -307,6 +465,78 @@ if (searchQuery) {
     text-decoration: underline;
   }
 
+  /* Series Sections (Grouped View) */
+  .series-sections {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12);
+  }
+
+  .series-section {
+    padding: var(--space-6);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .series-section[data-category="cs"] {
+    border-left: 4px solid #0369a1;
+  }
+
+  .series-section[data-category="book"] {
+    border-left: 4px solid #b45309;
+  }
+
+  .series-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .series-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .series-title .series-icon {
+    font-size: var(--text-2xl);
+  }
+
+  .series-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .post-count {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .view-all {
+    font-size: var(--text-sm);
+    color: var(--color-accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .view-all:hover {
+    text-decoration: underline;
+  }
+
+  .series-posts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-4);
+  }
+
   /* Grid */
   .blog-grid {
     display: grid;
@@ -332,8 +562,21 @@ if (searchQuery) {
       grid-template-columns: 1fr;
     }
 
+    .series-posts {
+      grid-template-columns: 1fr;
+    }
+
+    .series-list {
+      grid-template-columns: 1fr;
+    }
+
     .search-form {
       max-width: none;
+    }
+
+    .series-header {
+      flex-direction: column;
+      align-items: flex-start;
     }
   }
 </style>

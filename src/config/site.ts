@@ -37,6 +37,37 @@ export const siteConfig = {
     { slug: 'book', name: 'Book Notes', description: '개발 서적 정리 및 리뷰' },
     { slug: 'troubleshooting', name: 'Troubleshooting', description: '실무 문제 해결 기록' },
   ],
+  // 블로그 시리즈 (세부 분류)
+  blogSeries: [
+    { 
+      slug: '매일메일 프론트엔드', 
+      name: '매일메일 프론트엔드', 
+      category: 'cs',
+      folder: 'cs/frontend',
+      icon: '🌐'
+    },
+    { 
+      slug: '매일메일 백엔드', 
+      name: '매일메일 백엔드', 
+      category: 'cs',
+      folder: 'cs/backend',
+      icon: '⚙️'
+    },
+    { 
+      slug: 'React', 
+      name: 'React', 
+      category: 'cs',
+      folder: 'cs/react',
+      icon: '⚛️'
+    },
+    { 
+      slug: '혼자 공부하는 컴퓨터 구조 + 운영체제', 
+      name: '혼자 공부하는 컴퓨터 구조 + 운영체제', 
+      category: 'book',
+      folder: 'books/self-taught-ca-os',
+      icon: '📚'
+    },
+  ],
 };
 
 export type SiteConfig = typeof siteConfig;
