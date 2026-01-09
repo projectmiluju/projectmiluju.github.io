@@ -1,0 +1,294 @@
+---
+title: "Next.js App Router 가이드 정리: Content Security Policy (CSP)"
+date: 2025-02-17
+summary: "- **CSP(Content Security Policy)** 는 XSS, 클릭재킹(clickjacking), 기타 코드 인젝션 공격으로부터 애플리케이션을 보호하기 위한 보안 메커니즘이다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 6
+---
+
+# Next.js App Router 가이드 정리: Content Security Policy (CSP)
+
+---
+
+## 1. CSP 개념과 역할
+
+- **CSP(Content Security Policy)** 는 XSS, 클릭재킹(clickjacking), 기타 코드 인젝션 공격으로부터 애플리케이션을 보호하기 위한 보안 메커니즘이다.
+- CSP를 통해 다음과 같은 리소스의 **허용 origin** 을 명시적으로 지정할 수 있다.
+    - 스크립트, 스타일, 이미지, 폰트, 오브젝트, 오디오/비디오, iframe 등
+- 브라우저는 `Content-Security-Policy` 헤더(또는 `<meta http-equiv="Content-Security-Policy">`)를 읽어서, 정책에 어긋나는 리소스 로드를 차단한다.
+
+---
+
+## 2. Nonce 기반 CSP
+
+### 2.1 Nonce란 무엇인가?
+
+- **Nonce**는 한 번만 사용하는 임의의 랜덤 문자열이다.
+- CSP에서 Nonce는 **특정 인라인 스크립트/스타일만 선택적으로 허용** 하기 위해 사용된다.
+- 공격자가 악성 스크립트를 주입하더라도, 올바른 Nonce 값을 맞출 수 없으므로 실행되지 않도록 막을 수 있다.
+
+### 2.2 Proxy에서 Nonce 생성 및 헤더 설정
+
+Next.js App Router에서는 `proxy.ts`(기존 `middleware.ts` 역할)를 사용하여 요청 단위로 Nonce를 생성하고, CSP 헤더에 추가하는 방식을 사용한다.
+
+1. `proxy.ts`에서 요청마다 `crypto.randomUUID()` 등으로 Nonce를 생성한다.
+2. CSP 문자열을 작성할 때, `script-src`, `style-src` 등에 `'nonce-{nonce값}'` 을 포함시킨다.
+3. 완성된 CSP 문자열을 공백/줄바꿈을 정리한 뒤 `Content-Security-Policy` 헤더에 세팅한다.
+4. 나중에 Server Component에서 사용할 수 있도록 같은 Nonce를 커스텀 헤더(예: `x-nonce`)에도 저장한다.
+5. `NextResponse.next()` 호출 시 요청 헤더와 응답 헤더에 모두 CSP를 추가한다.
+
+```ts
+// 예시 개념 (실제 코드는 문서 참고)
+export function proxy(request: NextRequest) {
+  const nonce = /* 랜덤 Nonce 생성 */
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+  `
+
+  const value = cspHeader.replace(/\s{2,}/g, ' ').trim()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', value)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set('Content-Security-Policy', value)
+  return response
+}
+```
+
+### 2.3 Proxy 매처 설정
+
+- 기본적으로 Proxy는 모든 요청에 대해 실행되지만, `config.matcher`를 사용하여 **특정 경로/조건에만 적용** 할 수 있다.
+- 문서에서는 다음과 같은 패턴을 예시로 제시한다.
+    - `/api`, `/_next/static`, `/_next/image`, `favicon.ico` 등은 제외
+    - `next/link` 프리페치 요청(`next-router-prefetch`, `purpose: prefetch` 헤더)을 제외
+
+이를 통해, 실제 HTML 문서 응답에만 CSP를 적용하고 정적 파일/프리페치에는 불필요한 헤더를 붙이지 않도록 할 수 있다.
+
+### 2.4 Nonce가 Next.js에서 동작하는 방식
+
+동적 렌더링 페이지에서 Nonce 기반 CSP가 동작하는 과정은 다음과 같다.
+
+1. **Proxy에서 Nonce 생성**
+    - 요청마다 Nonce를 생성하여 CSP 헤더와 `x-nonce` 헤더에 저장한다.
+2. **Next.js가 Nonce 추출**
+    - 서버 렌더링 시 `Content-Security-Policy` 헤더에서 `'nonce-{value}'` 패턴을 찾아 Nonce를 파싱한다.
+3. **Nonce 자동 적용**
+    - React/Next.js 런타임 스크립트
+    - 각 페이지별 JS 번들
+    - Next.js가 생성하는 인라인 스타일/스크립트
+    - `nonce` prop을 가진 `<Script>` 컴포넌트  
+      등에 자동으로 Nonce가 붙는다.
+
+개발자는 대부분의 경우 개별 `<script>` 태그에 Nonce를 수동으로 지정할 필요가 없다.
+
+### 2.5 동적 렌더링 강제 (`connection` 사용)
+
+- Nonce는 **요청 단위로 생성** 되므로 **정적 생성(Static Generation)** 단계에서는 사용할 수 없다.
+- Nonce 기반 CSP를 사용하려면 페이지를 **동적 렌더링** 하도록 강제해야 한다.
+- `next/server`의 `connection()` 함수를 호출하여 실제 요청이 올 때까지 렌더링을 지연시키는 패턴을 사용할 수 있다.
+
+```ts
+import { connection } from 'next/server'
+
+export default async function Page() {
+  await connection() // 요청이 도착할 때까지 대기
+  // 페이지 내용
+}
+```
+
+### 2.6 Server Component에서 Nonce 읽기
+
+- Server Component에서 `headers()` 함수를 통해 `x-nonce` 헤더를 읽을 수 있다.
+- 예를 들어, Google Tag Manager와 같이 `<Script>` 또는 서드파티 컴포넌트에 Nonce를 전달해 CSP 위반 없이 로드할 수 있다.
+
+```tsx
+import { headers } from 'next/headers'
+import Script from 'next/script'
+
+export default async function Page() {
+  const nonce = (await headers()).get('x-nonce')
+
+  return (
+    <Script
+      src="https://www.googletagmanager.com/gtag/js"
+      strategy="afterInteractive"
+      nonce={nonce ?? undefined}
+    />
+  )
+}
+```
+
+---
+
+## 3. Static vs Dynamic Rendering과 CSP
+
+### 3.1 Nonce 사용 시 요구사항
+
+Nonce 기반 CSP를 사용하면 다음과 같은 제약이 생긴다.
+
+- 모든 페이지가 **동적 렌더링** 되어야 한다.
+- 각 요청마다 새로운 Nonce가 생성되므로, **정적 최적화(Static Optimization)** 및 **ISR**이 비활성화된다.
+- 별도 설정 없이는 CDN에서 페이지를 캐시하기 어렵다.
+- **Partial Prerendering(PPR)** 과 호환되지 않는다.
+
+### 3.2 성능 영향
+
+- 요청마다 서버 렌더링이 발생하므로:
+    - 첫 페이지 로딩 시간이 느려질 수 있다.
+    - 서버 부하가 증가한다.
+    - 엣지/CDN 캐싱 이점을 활용하기 어렵다.
+    - 호스팅 비용이 증가할 수 있다.
+
+### 3.3 Nonce를 사용할 때의 기준
+
+다음과 같은 경우에는 비용을 감수하고서라도 Nonce 기반 CSP를 사용하는 것이 적절하다.
+
+- `'unsafe-inline'` 을 허용할 수 없는 엄격한 보안 요구사항이 있을 때
+- 민감한 데이터(금융, 의료, 개인정보 등)를 다루는 서비스
+- 특정 인라인 스크립트만 예외적으로 허용해야 할 때
+- 보안/규제 준수(Compliance) 측면에서 엄격한 CSP가 요구될 때
+
+---
+
+## 4. Nonce 없이 CSP 적용
+
+Nonce까지 필요하지 않은 애플리케이션에서는 `next.config.js`의 `headers()` 설정을 통해 CSP를 적용할 수 있다.
+
+- 이때는 일반적으로 `script-src`, `style-src` 에 `'unsafe-inline'`, `'unsafe-eval'` 등을 허용하여 개발 편의를 확보한다.
+- 예시는 다음과 같은 형태이다.
+
+```js
+// next.config.js (개념 예시)
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'unsafe-eval' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' blob: data:;
+  font-src 'self';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+  frame-ancestors 'none';
+  upgrade-insecure-requests;
+`
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: cspHeader.replace(/\n/g, ''),
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+이 방식은 **정적 생성 및 CDN 캐싱을 그대로 활용** 하면서도, 최소한의 CSP를 적용하고자 할 때 적합하다.
+
+---
+
+## 5. Subresource Integrity(SRI, 실험적)
+
+### 5.1 SRI 개념
+
+- SRI(Subresource Integrity)는 **빌드 시 자바스크립트 파일의 해시를 생성** 하고, 그 값을 `<script>` 태그의 `integrity` 속성에 추가하는 방식이다.
+- 브라우저는 다운로드한 파일의 해시가 `integrity` 속성과 일치하는지 확인하여, 중간에 변조되지 않았는지 검증한다.
+
+### 5.2 SRI 활성화
+
+- `next.config.js`의 `experimental.sri` 설정으로 활성화한다.
+- `sha256`, `sha384`, `sha512` 중 하나의 알고리즘을 지정할 수 있다.
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    sri: {
+      algorithm: 'sha256',
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+### 5.3 CSP와 SRI 결합
+
+- SRI를 사용할 때도 기존 CSP 정책을 그대로 유지할 수 있다.
+- 예를 들어 `script-src 'self';` 와 같은 비교적 엄격한 정책을 유지하면서, SRI를 통해 빌드 산출물의 무결성을 추가로 보장한다.
+- 동적 렌더링이 필요한 경우에는 여전히 Proxy 기반 Nonce를 함께 사용할 수 있다.
+
+### 5.4 SRI의 장점과 한계
+
+**장점**
+
+- 정적 생성 및 CDN 캐싱을 그대로 사용할 수 있다.
+- 각 요청마다 서버 렌더링을 하지 않아도 되므로 성능에 유리하다.
+- 빌드 시점에 해시를 생성하므로, 배포된 리소스의 무결성을 담보하기 쉽다.
+
+**한계**
+
+- 현재 **실험적 기능**이며 향후 변경/제거될 수 있다.
+- **App Router + webpack** 조합에서만 지원되며, Turbopack이나 Pages Router에서는 사용할 수 없다.
+- 빌드 시점에 결정되는 정적 리소스에만 적용되므로 **동적으로 생성되는 스크립트**에는 적용하기 어렵다.
+
+---
+
+## 6. 개발/운영 환경에서의 CSP 설정
+
+### 6.1 개발 환경
+
+- 개발 모드에서는 디버깅 도구, 개발용 런타임 등이 `eval` 이나 인라인 스타일을 사용하기 때문에, CSP를 너무 엄격하게 적용하면 개발이 어려워진다.
+- `NODE_ENV === 'development'` 인 경우에만 다음과 같이 완화된 설정을 사용하는 패턴이 제시된다.
+    - `script-src` 에 `'unsafe-eval'` 추가
+    - `style-src` 에 `'unsafe-inline'` 또는 Nonce 대신 인라인 허용
+
+### 6.2 운영 환경에서의 주의사항
+
+운영 배포 시 자주 발생하는 문제로는 다음과 같은 것들이 있다.
+
+- Proxy가 모든 필요한 라우트에서 실행되지 않아 Nonce가 적용되지 않는 경우
+- Next.js 정적 자산(`_next/static`, 이미지 등)이 CSP에 의해 차단되는 경우
+- Google Analytics, Tag Manager 등 서드파티 스크립트 도메인을 CSP에 추가하지 않아 로드가 차단되는 경우
+
+---
+
+## 7. 서드파티 스크립트와 Common Pitfalls
+
+### 7.1 서드파티 스크립트 사용 시 Nonce 적용
+
+- 예: `@next/third-parties/google` 패키지의 `GoogleTagManager` 컴포넌트에 `nonce`를 전달하여 CSP 위반 없이 로드할 수 있다.
+- 이때 Proxy에서 작성하는 CSP에 `https://www.googletagmanager.com`, `https://www.google-analytics.com` 등의 도메인을 `script-src`, `connect-src`, `img-src` 등에 명시해야 한다.
+
+### 7.2 자주 발생하는 CSP 위반 유형
+
+흔한 위반 사례는 다음과 같다.
+
+1. **인라인 스타일**
+    - Nonce를 지원하는 CSS-in-JS 라이브러리 사용 또는 스타일을 외부 파일로 분리하는 것이 권장된다.
+2. **동적 import**
+    - `script-src` 정책에서 동적 import로 로딩되는 스크립트가 허용되는지 확인해야 한다.
+3. **WebAssembly 사용**
+    - WebAssembly를 사용하는 경우 `'wasm-unsafe-eval'` 등의 지시어를 추가해야 할 수 있다.
+4. **Service Worker**
+    - 서비스 워커 스크립트에 대해 적절한 정책을 정의해야 한다.
+
+---

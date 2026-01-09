@@ -1,0 +1,137 @@
+---
+title: "Next.js Production Checklist 가이드 정리"
+date: 2025-02-12
+summary: "Next.js 앱을 프로덕션에 올리기 전에는 **성능, UX, 보안, SEO, 타입 안정성**을 위한 점검이 필요합니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 32
+---
+
+# Next.js Production Checklist 가이드 정리
+
+## 1. 개요
+
+Next.js 앱을 프로덕션에 올리기 전에는 **성능, UX, 보안, SEO, 타입 안정성**을 위한 점검이 필요합니다.
+
+문서에서는 아래 관점에서 체크리스트를 제공합니다.
+
+- Next.js가 **기본으로 해주는 자동 최적화**
+- 개발 중에 지켜야 할 패턴(라우팅/렌더링/데이터/접근성 등)
+- 배포 직전 점검(빌드/성능 측정/번들 분석 등)
+
+---
+
+## 2. Automatic optimizations (기본 활성화)
+
+다음 최적화는 별도 설정 없이 기본 적용됩니다.
+
+- **Server Components**: 기본이 서버 컴포넌트라 클라이언트 JS 번들 크기에 영향이 없음
+- **Code-splitting**: 라우트 세그먼트 기준 자동 코드 스플리팅
+- **Prefetching**: 뷰포트에 들어온 링크를 백그라운드에서 prefetch(필요 시 opt-out 가능)
+- **Static Rendering**: 빌드 타임 렌더링 + 캐싱(필요한 라우트만 Dynamic Rendering으로 opt-in)
+- **Caching**: 데이터 요청, 렌더링 결과, 정적 자산 등을 캐싱해 네트워크/서버 비용 절감
+
+---
+
+## 3. During development 체크리스트
+
+### 3.1 Routing and rendering
+
+- **Layouts**: 레이아웃으로 공통 UI를 공유하고, 네비게이션에서 partial rendering을 활용
+- **`<Link>`**: 클라이언트 네비게이션 + prefetch를 위해 Link 사용
+- **Error Handling**: catch-all 에러 및 404를 커스텀 에러 페이지로 “우아하게” 처리
+- **Client/Server 컴포지션**: `"use client"` 경계를 점검해 불필요하게 클라이언트 번들이 커지지 않게 구성
+- **Dynamic APIs 주의**:
+    - `cookies()` 같은 Dynamic API나 `searchParams` 사용은 **해당 라우트 전체를 Dynamic Rendering**으로 만들 수 있음
+    - Root Layout에서 사용하면 앱 전체가 영향을 받을 수 있으니 의도적으로 사용
+    - 필요 시 `<Suspense>` 경계로 감싸는 것이 권장됨
+- 참고: Partial Prerendering(PPR, experimental)은 “라우트 전체를 dynamic으로 만들지 않고도 일부만 dynamic”하게 할 수 있는 방향성
+
+---
+
+### 3.2 Data fetching and caching
+
+- **Server Components에서 데이터 페칭**: 서버에서 가져오면 클라이언트 번들에 영향이 줄고, 네트워크 워터폴을 줄이기 쉬움
+- **Route Handlers**: Client Component에서 백엔드 자원 접근 시 활용 가능  
+  단, **Server Component에서 Route Handler를 호출하면 불필요한 서버 요청이 1번 더 생기므로 피하는 것이 권장**
+- **Streaming + Suspense**: `loading.js`와 Suspense로 “전체 화면 블로킹”을 피하고 점진적 UI 전송
+- **Parallel Data Fetching**: 네트워크 워터폴을 줄이기 위해 병렬 페칭, 필요 시 preload 전략 고려
+- **Data caching 점검**:
+    - 요청이 캐시되고 있는지 확인하고 적절히 opt-in
+    - `fetch`가 아닌 요청도 캐싱 고려(문서에서 “캐시되도록 보장”을 강조)
+- **Static Images**: `public/`에 둔 정적 자산은 자동 캐싱되므로 적극 활용
+
+---
+
+### 3.3 UI and accessibility
+
+- **Forms & Validation**: Server Actions로 폼 제출/서버 검증/에러 처리
+- **Global Error UI**: `app/global-error.tsx`로 앱 전역의 일관된 fallback UI 제공
+- **Global 404**: `app/global-not-found.tsx`로 전역 404 UX 통일
+- **Fonts**: Font Module로 폰트 최적화(외부 요청 제거, layout shift 감소)
+- **Images**: `<Image>`로 이미지 최적화(WebP 등, layout shift 방지)
+- **Scripts**: `<Script>`로 서드파티 스크립트 지연 로딩(메인 스레드 블로킹 방지)
+- **ESLint 접근성**: `eslint-plugin-jsx-a11y`로 접근성 이슈를 조기에 탐지
+
+---
+
+### 3.4 Security
+
+- **Tainting**: 민감 데이터가 클라이언트로 노출되지 않도록 객체/값을 taint 처리
+- **Server Actions 권한**: Server Action 호출 권한(인증/인가) 체크 필수, 보안 권장사항 검토
+- **Environment Variables**:
+    - `.env.*`는 `.gitignore`에 포함
+    - 공개 변수만 `NEXT_PUBLIC_` 접두사 사용
+- **CSP(Content Security Policy)**: XSS, clickjacking 등 위협 방어를 위해 CSP 적용 고려
+
+---
+
+### 3.5 Metadata and SEO
+
+- **Metadata API**: title/description 등 메타데이터를 통해 SEO 개선
+- **Open Graph 이미지**: 소셜 공유 대응
+- **Sitemap / Robots**: 검색엔진 크롤링/인덱싱을 돕기 위한 sitemap, robots 생성
+
+---
+
+### 3.6 Type safety
+
+- **TypeScript + TS Plugin**: 타입 안전성 및 조기 오류 탐지
+
+---
+
+## 4. Before going to production
+
+### 4.1 로컬에서 프로덕션 모드로 점검
+
+- `next build`로 빌드 에러를 잡고
+- `next start`로 프로덕션에 가까운 환경에서 성능을 측정
+
+### 4.2 Core Web Vitals 점검
+
+- Lighthouse를 **시크릿(incognito)**에서 실행해 사용자 경험을 시뮬레이션 테스트
+- Lighthouse는 시뮬레이션이므로, 실제 필드 데이터(Core Web Vitals)와 함께 보는 것이 권장
+- `useReportWebVitals` 훅을 사용해 CWV를 analytics로 전송할 수 있음
+
+### 4.3 번들 분석
+
+- `@next/bundle-analyzer`로 번들 크기/대형 의존성 확인
+- 의존성 추가의 영향도를 파악하는 도구 예시:
+    - Import Cost(IDE)
+    - Package Phobia / Bundle Phobia / bundlejs 등
+
+---
+
+## 5. 실전용 “최소 체크리스트”
+
+- [ ] `"use client"` 경계가 과하지 않은가?
+- [ ] Dynamic API(cookies/searchParams) 사용이 의도적인가?
+- [ ] 데이터 페칭이 병렬화/캐싱되어 있는가?
+- [ ] `loading.js` / Suspense로 블로킹을 줄였는가?
+- [ ] global-error / global-not-found로 일관된 장애 UX가 있는가?
+- [ ] 환경변수 관리(.env.* gitignore, NEXT_PUBLIC_ 구분)가 되어 있는가?
+- [ ] Metadata/OG/Sitemap/Robots가 준비되어 있는가?
+- [ ] `next build` + `next start`로 로컬 프로덕션 검증을 했는가?
+- [ ] Lighthouse + CWV 수집 전략(useReportWebVitals)이 있는가?
+- [ ] 번들 분석으로 큰 의존성을 점검했는가?

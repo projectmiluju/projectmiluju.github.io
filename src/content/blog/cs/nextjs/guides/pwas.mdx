@@ -1,0 +1,197 @@
+---
+title: "Next.js Progressive Web Apps(PWA) 가이드 정리"
+date: 2025-02-13
+summary: "**PWA(Progressive Web Application)**는 웹의 배포 편의성과 네이티브 앱의 사용자 경험(설치, 푸시 등)을 결합한 형태입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 33
+---
+
+# Next.js Progressive Web Apps(PWA) 가이드 정리
+
+## 1. PWA 개요
+
+**PWA(Progressive Web Application)**는 웹의 배포 편의성과 네이티브 앱의 사용자 경험(설치, 푸시 등)을 결합한 형태입니다.
+
+문서에서 언급하는 PWA의 장점 예시:
+
+- 앱스토어 승인 대기 없이 **즉시 업데이트 배포**
+- 단일 코드베이스로 **크로스 플랫폼** 지원
+- 홈 화면 설치, 푸시 알림 같은 **네이티브 유사 기능**
+
+---
+
+## 2. Creating a PWA with Next.js (문서 흐름)
+
+문서는 “웹 앱 매니페스트 → 푸시 알림(클라이언트 + Server Actions) → VAPID 키 → 서비스 워커” 순서로 예시를 제공합니다.
+
+---
+
+## 3. Step 1: Web App Manifest 만들기
+
+Next.js(App Router)는 Web App Manifest 생성을 지원합니다.
+
+- `app/manifest.ts` 또는 `app/manifest.json` 생성 가능
+- TypeScript 예시는 `MetadataRoute.Manifest` 타입을 사용합니다.
+
+```ts
+// app/manifest.ts
+import type { MetadataRoute } from 'next'
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'Next.js PWA',
+    short_name: 'NextPWA',
+    description: 'A Progressive Web App built with Next.js',
+    start_url: '/',
+    // ...theme_color, background_color, display 등
+    icons: [
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+      },
+    ],
+  }
+}
+```
+
+- 매니페스트에는 앱 이름, 아이콘, 표시 방식 등이 들어가며
+- 사용자 기기에서 “홈 화면 설치(앱처럼 보이기)”에 필요한 정보를 제공합니다.
+- 아이콘 세트는 favicon generator 같은 도구로 만든 뒤 `public/` 폴더에 배치하는 방식을 권장합니다.
+
+---
+
+## 4. Step 2: Web Push Notifications 구현(클라이언트)
+
+문서에서 지원 브라우저 예시:
+
+- iOS 16.4+ (홈 화면에 설치된 앱 기준)
+- Safari 16 (macOS 13+)
+- Chromium 기반 브라우저
+- Firefox
+
+### 클라이언트 코드 구성(요지)
+
+`app/page.tsx`에서
+
+- 브라우저의 Service Worker + PushManager로 구독을 생성하고
+- 생성된 subscription을 Server Actions로 전송하여 저장/삭제
+- 테스트 알림을 전송하는 흐름을 만듭니다.
+
+핵심 포인트 예시:
+
+- VAPID 공개키를 Web Push API에 맞게 변환하는 `urlBase64ToUint8Array`
+- `navigator.serviceWorker.ready` 이후 `pushManager.subscribe(...)` 호출
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`를 사용
+
+```ts
+const sub = await registration.pushManager.subscribe({
+  userVisibleOnly: true,
+  applicationServerKey: urlBase64ToUint8Array(
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+  ),
+})
+```
+
+### iOS 설치 안내(요지)
+
+문서 예시는 iOS 기기에서 “홈 화면에 추가” 안내를 띄우기 위해:
+
+- `display-mode: standalone` 여부를 체크하고(이미 설치면 안내 숨김)
+- iOS 유저에 한해 설치 안내 문구를 보여줍니다.
+
+---
+
+## 5. Step 3: Server Actions로 구독 저장/삭제/알림 전송
+
+문서 예시는 `app/actions.ts`에 Server Actions를 만들고 `web-push`를 사용합니다.
+
+```ts
+// app/actions.ts
+'use server'
+
+import webpush from 'web-push'
+
+webpush.setVapidDetails(
+  '<mailto:your-email@example.com>',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+)
+
+let subscription: PushSubscription | null = null
+
+export async function subscribeUser(sub: PushSubscription) {
+  subscription = sub
+  // 프로덕션에서는 DB에 저장 권장
+  return { success: true }
+}
+
+export async function unsubscribeUser() {
+  subscription = null
+  // 프로덕션에서는 DB에서 삭제 권장
+  return { success: true }
+}
+
+export async function sendNotification(message: string) {
+  if (!subscription) throw new Error('No subscription available')
+  // webpush.sendNotification(...)으로 실제 전송
+}
+```
+
+문서 강조:
+
+- 예시에서는 단일 변수에 저장하지만, **프로덕션 환경에서는 DB 저장이 권장**됩니다(서버 재시작/다중 사용자 대응).
+
+---
+
+## 6. Step 4: VAPID Keys 생성
+
+Web Push API를 쓰려면 VAPID 키가 필요합니다. 문서 예시:
+
+1) web-push CLI를 전역 설치
+
+```bash
+npm install -g web-push
+```
+
+2) 키 생성
+
+```bash
+web-push generate-vapid-keys
+```
+
+3) `.env`에 등록
+
+```bash
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_public_key_here
+VAPID_PRIVATE_KEY=your_private_key_here
+```
+
+---
+
+## 7. Step 5~8 (서비스 워커 / 설치 / 로컬 테스트 / 보안)
+
+문서에서는 이어서 아래를 다룹니다(여기부터는 “구현 흐름” 중심으로 정리합니다).
+
+- **Service Worker 생성**: 푸시 이벤트를 수신하고 알림을 표시하도록 구성  
+  (푸시를 쓰려면 서비스 워커가 사실상 필수)
+- **Adding to Home Screen**: 설치 UX(특히 iOS) 안내
+- **Testing Locally**: 로컬에서 PWA 기능 검증
+- **Securing your application**: HTTPS, 키 관리, 권한 체크 등 보안 고려
+
+> 참고: Step 5~8은 프로젝트 특성(배포 환경, 오프라인 캐싱 전략, 인증 방식)에 따라 구현이 크게 달라질 수 있으니,
+> “문서 예시를 그대로 붙여넣기”보다 **개념/흐름을 이해하고 적용**하는 것이 중요합니다.
+
+---
+
+## 8. 정리
+
+PWA 구현을 Next.js(App Router)로 진행할 때의 핵심 흐름은 다음과 같습니다.
+
+1. `app/manifest.ts`로 **매니페스트 제공**
+2. 클라이언트에서 service worker + push subscribe 구현
+3. Server Actions로 **구독 저장/삭제/푸시 전송**
+4. VAPID 키를 안전하게 관리하고 운영 환경에서는 구독 정보를 DB에 저장
+5. 서비스 워커/HTTPS/보안 정책까지 포함해 “실제 서비스 가능한” 상태로 확장

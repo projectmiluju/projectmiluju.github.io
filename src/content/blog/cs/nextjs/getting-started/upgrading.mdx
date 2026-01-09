@@ -1,0 +1,224 @@
+---
+title: "Next.js Upgrading 정리"
+date: 2025-01-10
+summary: "Next.js Docs – Getting Started: **Upgrading** 페이지를 기반으로, Next.js 애플리케이션을 최신 버전 또는 canary 버전으로 업그레이드하는 방법을 정리한 문서입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 18
+---
+
+# Next.js Upgrading 정리
+
+Next.js Docs – Getting Started: **Upgrading** 페이지를 기반으로, Next.js 애플리케이션을 최신 버전 또는 canary 버전으로 업그레이드하는 방법을 정리한 문서입니다.
+
+---
+
+## 1. 개요
+
+이 페이지의 목적은 다음 두 가지입니다.
+
+1. **최신 안정 버전(latest)** 으로 업그레이드하는 방법 정리
+2. **canary 버전**으로 업그레이드하는 방법과, canary에서만 제공되는 기능 파악
+
+또한, 버전별 상세 변경 사항은 별도의 **Version Upgrade Guides** 문서(예: v14, v15, v16 가이드)에서 다룹니다.
+
+---
+
+## 2. Latest Version (최신 안정 버전으로 업그레이드)
+
+### 2.1 `next upgrade` 명령어 사용 (Next.js 16+)
+
+Next.js 16부터는 **공식 `next upgrade` 명령어**를 사용해 업그레이드를 자동화할 수 있습니다.
+
+```bash
+next upgrade
+```
+
+이 명령어는 다음과 같은 작업을 자동으로 수행합니다.
+
+- `next`, `react`, `react-dom`, `eslint-config-next` 등의 버전을 최신으로 올림
+- 필요한 경우 일부 설정 파일을 업데이트 (예: `next.config`, ESLint 설정 등)
+- 버전별 codemod를 내부적으로 활용해 마이그레이션을 도와줌
+
+> `next upgrade`는 **Next.js 16 이상 버전에서만 지원**됩니다.  
+> 15 이하 버전에서는 아래 **codemod** 또는 수동 설치 방법을 사용해야 합니다.
+
+### 2.2 Next.js 15 이하: codemod 사용
+
+Next.js 15 및 그 이전 버전에서는 `next upgrade` 명령이 지원되지 않습니다.  
+대신 **공식 codemod 패키지**를 사용합니다.
+
+```bash
+npx @next/codemod@canary upgrade latest
+```
+
+- `@next/codemod`는 Next.js 팀에서 제공하는 공식 코드 변환 도구입니다.
+- `upgrade latest`는 현재 프로젝트를 최신 Next.js 버전에 맞게 가능한 한 자동으로 마이그레이션합니다.
+- 실제로는
+    - 패키지 버전 올리기
+    - 일부 API 이름 변경
+    - 설정 파일 수정
+    - Deprecated 패턴을 새로운 문법으로 교체  
+      등 다양한 작업을 진행할 수 있습니다.
+
+### 2.3 수동 업그레이드 (Manual upgrade)
+
+자동화 도구 대신 **직접 버전을 올리고 싶을 때**는 패키지 매니저로 각 의존성을 최신 버전으로 설치합니다.
+
+아래 예시는 npm 기준입니다.
+
+```bash
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+패키지 매니저별 예시:
+
+```bash
+# npm
+npm i next@latest react@latest react-dom@latest eslint-config-next@latest
+
+# pnpm
+pnpm i next@latest react@latest react-dom@latest eslint-config-next@latest
+
+# yarn
+yarn add next@latest react@latest react-dom@latest eslint-config-next@latest
+
+# bun
+bun add next@latest react@latest react-dom@latest eslint-config-next@latest
+```
+
+수동 업그레이드 시에는 추가로 다음도 확인하는 것이 좋습니다.
+
+- TypeScript 사용 시: `typescript`, `@types/react`, `@types/react-dom` 최신 버전으로 업그레이드
+- ESLint 사용 시: `eslint`, `eslint-config-next` 버전 호환성 체크
+- Node.js 최소 버전 요구사항 (각 Version Guide 참고)
+
+---
+
+## 3. Canary Version (canary 버전으로 업그레이드)
+
+canary 버전은 **아직 정식 릴리스되지 않은 최신 기능**을 미리 사용해볼 수 있는 채널입니다.
+
+### 3.1 업그레이드 전 준비
+
+canary로 올리기 전에는 다음을 확인하는 것이 좋습니다.
+
+1. 현재 Next.js가 **최신 안정 버전**인지 확인
+2. 애플리케이션이 정상 동작하는지 (테스트/빌드 통과 여부)
+3. Git에 변경 사항 커밋 완료 (되돌릴 수 있도록)
+
+### 3.2 canary 설치
+
+가장 단순한 방식은 `next` 패키지를 canary 태그로 설치하는 것입니다.
+
+```bash
+npm i next@canary
+```
+
+다른 패키지 매니저 사용 예:
+
+```bash
+pnpm i next@canary
+yarn add next@canary
+bun add next@canary
+```
+
+> 보통 `react`, `react-dom`은 stable로 두고, Next.js만 canary를 사용합니다.  
+> (Version Guide에서 별도 지시가 있는 경우 그에 따릅니다.)
+
+### 3.3 언제 canary를 사용할까?
+
+canary는 일반적으로 다음과 같은 상황에서 유용합니다.
+
+- **새 기능을 미리 평가**하거나 데모를 만들 때
+- 이슈가 최신 canary에서 이미 해결되었는지 확인하고 싶을 때
+- 라이브러리/플랫폼이 Next.js 최신 기능과 호환되는지 검증할 때
+
+프로덕션 환경에서는 안정성과 리스크를 고려해, **充분한 테스트 후에만 사용**하는 것이 좋습니다.
+
+---
+
+## 4. Features available in canary (현재 canary에서만 제공되는 기능)
+
+문서 기준으로, 현재 canary 채널에서만 제공되는 주요 기능은 **Authentication(인증)** 관련 기능들입니다.
+
+- `forbidden`
+- `unauthorized`
+- `forbidden.js`
+- `unauthorized.js`
+- `authInterrupts`
+
+이 기능들은 인증 실패나 권한 부족 상황에서
+
+- 특정 UI를 렌더링하거나
+- 라우팅을 제어하고
+- 인증 흐름을 끊었다가 다시 이어주는 등의 동작을 세밀하게 제어하는 데 사용됩니다.
+
+정식 릴리스 시점에는 stable 채널에도 포함될 수 있으며,  
+그 경우 canary 전용 목록에서 제거되거나 문서 내용이 변경될 수 있습니다.
+
+---
+
+## 5. Version Guides (버전별 업그레이드 가이드)
+
+업그레이드 페이지에는 버전별 상세 가이드가 함께 나열되어 있습니다.
+
+예시:
+
+- **Version 16** – Next.js 15에서 16으로 업그레이드
+- **Version 15** – Next.js 14에서 15로 업그레이드
+- **Version 14** – Next.js 13에서 14로 업그레이드
+
+각 가이드에는 보통 다음 정보가 포함됩니다.
+
+- 최소 **Node.js 및 TypeScript 버전 요구사항**
+- 새로 기본값이 된 기능 (예: Turbopack, 새로운 런타임 설정 등)
+- Breaking Changes 및 마이그레이션 방법
+- 필요한 경우 사용할 수 있는 **codemod** 예시
+
+실제 프로젝트를 업그레이드할 때는:
+
+1. `Upgrading` 페이지에서 전체 흐름을 파악하고,
+2. **현재 사용 중인 버전 → 목표 버전**에 해당하는 Version Guide를 반드시 같이 참고하는 것이 좋습니다.
+
+---
+
+## 6. 업그레이드 실전 체크리스트
+
+다음 체크리스트를 기준으로 업그레이드를 진행하면 비교적 안전하게 버전을 올릴 수 있습니다.
+
+### 6.1 사전 준비
+
+- [ ] Git 브랜치 생성 (예: `chore/upgrade-next-16`)
+- [ ] 현재 버전에서 테스트/빌드 통과 확인 (`npm test`, `npm run lint`, `npm run build`)
+- [ ] 주요 의존성 버전 기록 (`next`, `react`, `react-dom`, `typescript`, `eslint` 등)
+
+### 6.2 업그레이드 수행
+
+1. **방법 선택**
+    - 가능하면 `next upgrade` (Next.js 16 이상)
+    - 그렇지 않으면 `npx @next/codemod@canary upgrade latest`
+    - 또는 수동으로 패키지 버전 업데이트
+
+2. **패키지 설치**
+    - 선택한 방식에 맞게 `next`, `react`, `react-dom`, `eslint-config-next` 등 설치
+
+3. **TypeScript/ESLint 정리**
+    - TypeScript 사용 시 `typescript`, `@types/react`, `@types/react-dom` 버전도 점검
+    - ESLint 버전과 `eslint-config-next` 호환 여부 확인
+
+### 6.3 검증 및 수정
+
+- [ ] `npm run lint` / `npm run test` / `npm run build` 실행
+- [ ] 터미널 워닝/에러 중 **deprecated** 관련 메시지 확인
+- [ ] 로컬에서 주요 페이지/기능 수동 테스트
+- [ ] 필요한 경우 Version Guide에서 breaking change 섹션 세부 확인
+
+### 6.4 canary 사용 시 추가 확인
+
+- [ ] canary 설치 후, 동일한 테스트/빌드 통과 확인
+- [ ] 새로 사용하는 기능이 있다면 관련 문서 읽기 (예: 인증 관련 API)
+- [ ] 프로덕션 적용 전, 스테이징 환경에서 충분한 기간 관찰
+
+---

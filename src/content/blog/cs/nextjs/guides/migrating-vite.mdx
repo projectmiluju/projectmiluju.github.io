@@ -1,0 +1,302 @@
+---
+title: "Next.js로 마이그레이션: Vite 가이드 정리"
+date: 2025-02-05
+summary: "이 문서는 기존 **Vite(React)** 프로젝트를 **Next.js(App Router)**로 옮기는 공식 절차를,"
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 26
+---
+
+# Next.js로 마이그레이션: Vite 가이드 정리
+
+## 1. 개요
+
+이 문서는 기존 **Vite(React)** 프로젝트를 **Next.js(App Router)**로 옮기는 공식 절차를,
+“Draft Mode 정리” 형식으로 재구성한 것입니다.
+
+초기 목표는 **빠르게 “동작하는 Next.js 앱”을 만드는 것**이며, 처음에는 기존 라우터를 유지하고
+Next.js를 **SPA 형태로 먼저 구동**한 뒤 점진적으로 App Router를 도입하는 전략을 사용합니다.
+
+---
+
+## 2. Step-by-step 마이그레이션
+
+### Step 1: Next.js 설치
+
+```bash
+npm install next@latest
+```
+
+---
+
+### Step 2: Next.js 설정 파일 생성
+
+프로젝트 루트에 `next.config.mjs` 생성:
+
+```js
+// next.config.mjs
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // SPA 정적 export
+  distDir: './dist', // Vite의 dist 디렉터리와 맞춤
+}
+
+export default nextConfig
+```
+
+> `.js` 또는 `.mjs` 모두 사용 가능
+
+---
+
+### Step 3: TypeScript 설정 업데이트(사용 시)
+
+TypeScript를 사용한다면 `tsconfig.json`을 Next.js 호환 형태로 수정합니다.
+
+핵심 변경 사항:
+
+- `tsconfig.node.json` project reference 제거
+- `./dist/types/**/*.ts`, `./next-env.d.ts`를 include에 추가
+- `./node_modules`를 exclude에 추가
+- compilerOptions.plugins에 `{ "name": "next" }` 추가
+- `esModuleInterop: true`, `jsx: "react-jsx"`, `allowJs: true` 등
+
+예시:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["./src", "./dist/types/**/*.ts", "./next-env.d.ts"],
+  "exclude": ["./node_modules"]
+}
+```
+
+---
+
+### Step 4: Root Layout 만들기(기존 index.html 변환)
+
+Vite의 `index.html`을 Next.js Root Layout으로 변환합니다.
+
+1. `src/app` 생성
+2. `app/layout.tsx` 생성
+3. `index.html` 내용을 옮기되,
+    - `body` 안의 `div#root`와 `script` 태그는 제거하고
+    - `<div id="root">{children}</div>`로 교체
+
+예시(초기):
+
+```tsx
+// app/layout.tsx
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        <title>My App</title>
+        <meta name="description" content="My App is a..." />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+그리고 Next.js가 기본 제공하는 meta charset/viewport는 제거할 수 있습니다.  
+또한 최종적으로는 Metadata API로 선언하는 방식이 권장됩니다.
+
+```tsx
+// app/layout.tsx
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: 'My App is a...',
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="root">{children}</div>
+      </body>
+    </html>
+  )
+}
+```
+
+---
+
+### Step 5: 엔트리포인트 페이지 만들기(옵셔널 캐치올)
+
+Vite의 `main.tsx`에 해당하는 엔트리포인트를 App Router로 구성합니다.
+
+- SPA 형태로 모든 라우트를 한 페이지로 받기 위해 `app/[[...slug]]/page.tsx` 사용
+
+```tsx
+// app/[[...slug]]/page.tsx
+import '../../index.css'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return '...' // 다음 단계에서 교체
+}
+```
+
+그리고 클라이언트 전용 엔트리포인트를 추가합니다.
+
+```tsx
+// app/[[...slug]]/client.tsx
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const App = dynamic(() => import('../../App'), { ssr: false })
+
+export function ClientOnly() {
+  return <App />
+}
+```
+
+`page.tsx`에서 사용:
+
+```tsx
+// app/[[...slug]]/page.tsx
+import '../../index.css'
+import { ClientOnly } from './client'
+
+export function generateStaticParams() {
+  return [{ slug: [''] }]
+}
+
+export default function Page() {
+  return <ClientOnly />
+}
+```
+
+---
+
+### Step 6: 정적 이미지 import 변경
+
+Vite: 이미지 import → URL 문자열  
+Next.js: 이미지 import → 객체
+
+따라서 `<img>`를 유지한다면 `logo.src` 사용:
+
+```tsx
+import logo from '../public/logo.png'
+
+export default function App() {
+  return <img src={logo.src} />
+}
+```
+
+---
+
+### Step 7: 환경 변수 마이그레이션
+
+- Vite 클라이언트 노출: `VITE_`
+- Next.js 클라이언트 노출: `NEXT_PUBLIC_`
+
+또한 Vite의 `import.meta.env.*` 일부는 Next.js에 없으므로 다음처럼 바꿉니다.
+
+- `import.meta.env.MODE` ⇒ `process.env.NODE_ENV`
+- `import.meta.env.PROD` ⇒ `process.env.NODE_ENV === 'production'`
+- `import.meta.env.DEV` ⇒ `process.env.NODE_ENV !== 'production'`
+- `import.meta.env.SSR` ⇒ `typeof window !== 'undefined'`
+
+`BASE_URL`을 쓰고 있었다면, 직접 변수를 만들고 `basePath`로 연결할 수 있습니다.
+
+```env
+# .env
+NEXT_PUBLIC_BASE_PATH="/some-base-path"
+```
+
+```js
+// next.config.mjs
+const nextConfig = {
+  output: 'export',
+  distDir: './dist',
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH,
+}
+
+export default nextConfig
+```
+
+그리고 `import.meta.env.BASE_URL` 사용처는 `process.env.NEXT_PUBLIC_BASE_PATH`로 변경합니다.
+
+---
+
+### Step 8: package.json 스크립트 변경
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+`.gitignore`에 추가:
+
+```gitignore
+.next
+next-env.d.ts
+dist
+```
+
+이제 실행:
+
+```bash
+npm run dev
+```
+
+---
+
+### Step 9: Vite 잔여물 정리
+
+- `main.tsx`
+- `index.html`
+- `vite-env.d.ts`
+- `tsconfig.node.json`
+- `vite.config.ts`
+- Vite 관련 의존성 제거
+
+---
+
+## 3. 다음 단계(Next.js 장점 채택)
+
+초기에는 SPA로 띄웠지만, 이제 점진적으로 다음을 도입합니다.
+
+- 기존 라우터를 **Next.js App Router로 전환**
+- `<Image>`, `next/font`, `<Script>`로 성능 최적화
+- 서버 컴포넌트 기반 데이터 패칭/스트리밍 UI
+
+---

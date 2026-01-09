@@ -1,0 +1,96 @@
+---
+title: "Next.js Instrumentation 가이드 정리 (App Router)"
+date: 2025-01-25
+summary: "**Instrumentation**은 애플리케이션에 **모니터링/로깅 도구를 심는(instrument)** 작업입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 15
+---
+
+# Next.js Instrumentation 가이드 정리 (App Router)
+
+## 1. Instrumentation 개요
+
+**Instrumentation**은 애플리케이션에 **모니터링/로깅 도구를 심는(instrument)** 작업입니다.  
+운영 환경에서 성능/동작을 관찰하고, 문제를 더 빨리 디버깅할 수 있게 해줍니다.
+
+Next.js에서는 **서버 인스턴스가 시작될 때 1회 실행되는 훅**을 제공하고, 이 훅 안에서 OpenTelemetry 같은 도구를 등록하는 방식이 일반적입니다.
+
+---
+
+## 2. Step 1: `instrumentation.ts|js` 파일 만들기 (Convention)
+
+프로젝트 **루트**에 `instrumentation.ts` 또는 `instrumentation.js` 파일을 생성합니다.
+
+- `src` 폴더를 쓰는 경우: `src/` 아래에 `app/`, `pages/`와 **같은 레벨**에 둡니다.
+- `app/` 또는 `pages/` 안에 넣는 것이 아니라 **루트(or src 루트)** 에 둬야 합니다.
+- `pageExtensions`로 파일 suffix를 바꾸는 경우, `instrumentation` 파일명도 그 suffix에 맞춰야 합니다.
+
+---
+
+## 3. Step 2: `register()` 함수 export 하기
+
+`instrumentation.ts|js`에서 `register` 함수를 export 합니다.
+
+- 이 `register()`는 **새로운 Next.js 서버 인스턴스가 시작될 때 1번 호출**됩니다.
+
+예: Next.js + OpenTelemetry + `@vercel/otel` 조합
+
+```ts
+// instrumentation.ts
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel('next-app')
+}
+```
+
+---
+
+## 4. Examples
+
+### 4-1) Side effect가 있는 파일 import 하기
+
+“전역 변수 등록”, “초기화 코드 실행”처럼 import 자체의 부작용(side effect)이 목적이라면,  
+**`register()` 내부에서 `import()`로 불러오는 방식**이 권장됩니다.
+
+```ts
+// instrumentation.ts
+export async function register() {
+  await import('package-with-side-effect')
+}
+```
+
+- 파일 상단에서 전역 import로 넣기보다, `register()` 안에 모아서 관리하는 게 안전합니다.
+
+---
+
+### 4-2) Runtime별 코드 분리하기 (Node.js / Edge)
+
+Next.js는 모든 환경에서 `register()`를 호출할 수 있으므로,  
+특정 런타임에서 동작하지 않는 코드는 **조건부 import**로 분리합니다.
+
+- `process.env.NEXT_RUNTIME` 값을 사용해 런타임을 판별합니다.
+
+```ts
+// instrumentation.ts
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./instrumentation-node')
+  }
+
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    await import('./instrumentation-edge')
+  }
+}
+```
+
+---
+
+## 5. 정리
+
+- `instrumentation.ts|js`는 **루트(or src 루트)** 에 둡니다.
+- `register()`는 **서버 인스턴스 시작 시 1회** 호출되는 초기화 훅입니다.
+- 부작용 import는 `register()` 안에서 `import()`로 처리하는 패턴이 권장됩니다.
+- Node/Edge 런타임 차이는 `NEXT_RUNTIME`으로 분기해 **런타임별 파일**을 나눕니다.

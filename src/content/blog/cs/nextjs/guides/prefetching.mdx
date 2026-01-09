@@ -1,0 +1,244 @@
+---
+title: "Next.js Prefetching 가이드 정리"
+date: 2025-02-11
+summary: "**Prefetching**은 사용자가 실제로 이동하기 전에 필요한 리소스를 미리 가져와서,"
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 31
+---
+
+# Next.js Prefetching 가이드 정리
+
+## 1. Prefetching 개요
+
+**Prefetching**은 사용자가 실제로 이동하기 전에 필요한 리소스를 미리 가져와서,
+페이지 이동이 “즉시 일어나는 것처럼” 느껴지게 만드는 전략입니다.
+
+- Next.js는 앱 내 `<Link>`를 기반으로 **지능적으로 기본 prefetch**를 수행합니다.
+- 필요에 따라 자동/수동/호버 기반/비활성화 등으로 전략을 커스터마이징할 수 있습니다.
+
+---
+
+## 2. Prefetching이 실제로 가져오는 것
+
+라우트 이동 시 브라우저는 다음과 같은 자산을 가져옵니다.
+
+- 초기 네비게이션: HTML, JavaScript, React Server Components(RSC) Payload
+- 이후 네비게이션:
+    - Server Components에 대해선 **RSC Payload**
+    - Client Components에 대해선 **JS bundle**
+
+즉, prefetch는 “다음 라우트의 로딩에 필요한 것”을 미리 받아두는 동작입니다.
+
+---
+
+## 3. Automatic prefetch (기본 동작)
+
+가장 일반적인 케이스: `<Link>` 사용
+
+```tsx
+import Link from 'next/link'
+
+export default function NavLink() {
+  return <Link href="/about">About</Link>
+}
+```
+
+문서 핵심 포인트:
+
+- **Automatic prefetch는 production에서만 동작**합니다.
+- `prefetch={false}`로 비활성화할 수 있습니다.
+- `loading.js`가 존재하면 “전체 페이지”가 아니라 **레이아웃 ~ 첫 loading 경계까지**를 먼저 가져오는 식으로 최적화가 달라집니다.
+- Client cache TTL:
+    - `loading.js`가 없으면 앱 리로드까지 유지
+    - `loading.js`가 있으면 기본 30초(설정 가능)
+
+---
+
+## 4. Manual prefetch (원하는 타이밍에 직접)
+
+`useRouter()`의 `router.prefetch()`로 “뷰포트 진입 전” 혹은 “특정 이벤트(hover/scroll/analytics)” 등에 맞춰 prefetch할 수 있습니다.
+
+```tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { CustomLink } from '@components/link'
+
+export function PricingCard() {
+  const router = useRouter()
+  return (
+    <div onMouseEnter={() => router.prefetch('/pricing')}>
+      {/* other UI elements */}
+      <CustomLink href="/pricing">View Pricing</CustomLink>
+    </div>
+  )
+}
+```
+
+---
+
+## 5. Hover-triggered prefetch (호버 때만)
+
+기본은 “뷰포트 진입 시 prefetch”인데, 자원 사용을 줄이려면 “유저 의도(hover)” 이후에만 prefetch하도록 바꿀 수 있습니다.
+
+```tsx
+'use client'
+
+import Link from 'next/link'
+import { useState } from 'react'
+
+export function HoverPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <Link
+      href={href}
+      prefetch={active ? null : false}
+      onMouseEnter={() => setActive(true)}
+    >
+      {children}
+    </Link>
+  )
+}
+```
+
+- `prefetch={null}`: 사용자가 의도를 보인 이후 **기본(static) prefetch를 복구**
+
+---
+
+## 6. Extending / Ejecting Link (링크 동작을 직접 구현)
+
+문서에서는 `<Link>`를 확장하거나, `<a>` + `useRouter`로 네비게이션을 재구현할 수 있다고 설명합니다.
+
+다만 주의점이 큽니다.
+
+- `<Link>`를 벗어나면 **prefetch / cache invalidation / 접근성**까지 직접 책임져야 합니다.
+- 정말 기본 동작이 부족할 때만 선택하는 것이 좋습니다.
+
+예시(문서 패턴): `router.prefetch(href, { onInvalidate })`로 “캐시가 stale 의심될 때 재-prefetch”
+
+```tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+
+function ManualPrefetchLink({
+  href,
+  children,
+}: {
+  href: string
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      if (!cancelled) router.prefetch(href, { onInvalidate: poll })
+    }
+    poll()
+    return () => {
+      cancelled = true
+    }
+  }, [href, router])
+
+  return (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault()
+        router.push(href)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+```
+
+> 참고: `<a>`는 기본적으로 full page navigation을 유발하므로, `preventDefault()` 후 `router.push()`로 SPA 네비게이션을 구현합니다.
+
+---
+
+## 7. Disabled prefetch (특정 구간에서 완전히 끄기)
+
+예: 푸터 링크, 무한 스크롤 리스트처럼 “굳이 미리 가져올 필요가 없는 링크”
+
+```tsx
+'use client'
+
+import Link, { LinkProps } from 'next/link'
+
+function NoPrefetchLink({
+  prefetch,
+  ...rest
+}: LinkProps & { children: React.ReactNode }) {
+  return <Link {...rest} prefetch={false} />
+}
+```
+
+또는 간단히:
+
+```tsx
+<Link prefetch={false} href={`/blog/${post.id}`}>
+  {post.title}
+</Link>
+```
+
+문서 주의:
+
+- static route는 클릭 시점에만 가져오게 되고
+- dynamic route는 서버 렌더링이 끝난 뒤에야 네비게이션이 진행될 수 있어
+  “체감 속도”가 내려갈 수 있습니다.
+
+그래서 “완전 비활성화” 대신 “hover 기반으로 지연”하는 전략이 자주 더 균형적입니다.
+
+---
+
+## 8. Troubleshooting
+
+### 8.1 Prefetch 중 “원치 않는 부작용”이 실행되는 문제
+
+Layout/Page가 순수하지 않고(예: analytics 호출 등) side-effect가 있으면,
+그 코드가 **실제 방문이 아니라 prefetch 시점에 실행**될 수 있습니다.
+
+문서 해결:
+
+- side-effect는 `useEffect`로 옮기거나
+- 유저 액션으로 트리거되는 Server Action으로 분리
+
+### 8.2 Prefetch가 너무 많아 리소스를 잡아먹는 문제
+
+큰 링크 리스트(예: 무한 스크롤 테이블)에서 `<Link>`가 많으면 뷰포트 진입마다 prefetch가 발생할 수 있습니다.
+
+- `prefetch={false}`로 끄거나
+- hover 기반 prefetch로 전환
+
+---
+
+## 9. Prefetching과 PPR(Partial Prerendering)
+
+PPR이 켜지면 라우트가 아래처럼 분리될 수 있습니다.
+
+- prefetch 가능한 **static shell**은 즉시 스트리밍
+- dynamic data는 준비되면 스트리밍
+- `revalidateTag`, `revalidatePath` 같은 invalidation은 연결된 prefetch를 조용히 갱신
+
+---
+
+## 10. 정리
+
+- 기본은 `<Link>`의 자동 prefetch(프로덕션에서만).
+- 자원 사용을 줄이려면:
+    - footer/대량 링크 → `prefetch={false}`
+    - “의도 기반” → hover-triggered prefetch
+- side-effect는 prefetch 시점에 실행될 수 있으니, `useEffect` 등으로 분리하는 습관이 중요합니다.

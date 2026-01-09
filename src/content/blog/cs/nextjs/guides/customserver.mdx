@@ -1,0 +1,146 @@
+---
+title: "Next.js Custom Server 가이드 정리"
+date: 2025-02-19
+summary: "- Next.js는 기본적으로 `next start` 명령을 사용하면 자체 내장 서버를 함께 실행한다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 8
+---
+
+# Next.js Custom Server 가이드 정리
+
+## 1. 개요
+
+- Next.js는 기본적으로 `next start` 명령을 사용하면 자체 내장 서버를 함께 실행한다.
+- 기존 백엔드(예: 기존 Node 서버, Rails, Spring 등)를 가지고 있더라도 **반드시 커스텀 서버를 쓸 필요는 없다.**
+    - 일반적으로는 Next.js를 프런트 레이어로 두고, 기존 백엔드 API를 `fetch` 등으로 호출하면 된다.
+- **Custom Server**는 Next.js의 내장 서버 대신, 직접 Node.js 서버를 띄우면서 그 안에서 Next.js를 프로그래밍 방식으로 구동하는 방식이다.
+    - 커스텀 라우팅, 특수한 로깅/모니터링, 고급 통합 등이 필요한 경우에만 선택적으로 사용한다.
+
+> 권장 사항
+> - Next.js 공식 문서에서는 **대부분의 경우 커스텀 서버가 필요하지 않으며, 가급적 내장 서버와 파일 시스템 기반 라우팅을 사용하는 것을 권장**한다.
+
+## 2. Custom Server 사용 시 주의사항
+
+1. **자동 최적화 기능 손실**
+    - 커스텀 서버를 사용하면 `Automatic Static Optimization`과 같은 몇 가지 중요한 성능 최적화 기능이 비활성화될 수 있다.
+    - 정적 최적화, SSG 관련 기능을 최대한 활용하고 싶다면 커스텀 서버 사용을 다시 한 번 검토해야 한다.
+
+2. **Standalone Output 모드와 호환성 문제**
+    - `output: 'standalone'` 모드를 사용하는 경우, Next.js는 별도의 최소한의 `server.js`를 생성한다.
+    - 이 모드는 자체적으로 실행 가능한 서버 번들을 만들기 때문에, **커스텀 서버 파일을 따로 두고 함께 사용하는 것은 지원되지 않는다.**
+    - 즉, **Standalone 모드와 Custom Server는 동시에 사용할 수 없다.**
+
+3. **Node.js 버전 호환성**
+    - 커스텀 서버 파일(`server.js` 또는 `server.ts`)은 Next.js 컴파일러/번들링 대상이 아니다.
+    - 따라서, 해당 파일에서 사용하는 문법과 의존성은 **현재 사용하는 Node.js 버전에서 직접 실행 가능해야 한다.**
+    - 예: ES Module 문법 사용 시 Node 설정, `ts-node` 사용 여부 등을 별도로 고려해야 한다.
+
+## 3. 기본 예제 구조
+
+### 3.1 server.ts 예제
+
+```ts
+import { createServer } from 'http'
+import { parse } from 'url'
+import next from 'next'
+
+const port = parseInt(process.env.PORT || '3000', 10)
+const dev = process.env.NODE_ENV !== 'production'
+const app = next({ dev })
+const handle = app.getRequestHandler()
+
+app.prepare().then(() => {
+  createServer((req, res) => {
+    const parsedUrl = parse(req.url!, true)
+    handle(req, res, parsedUrl)
+  }).listen(port)
+
+  console.log(
+    `> Server listening at http://localhost:${port} as ${
+      dev ? 'development' : process.env.NODE_ENV
+    }`
+  )
+})
+```
+
+#### 흐름 설명
+
+1. `next({ dev })`
+    - Next.js 애플리케이션 인스턴스를 생성한다.
+    - `dev` 값을 통해 개발 모드인지, 프로덕션 모드인지를 설정한다.
+
+2. `app.getRequestHandler()`
+    - Next.js가 HTTP 요청을 처리하기 위한 공용 핸들러를 반환한다.
+    - 이 핸들러는 페이지 라우팅, 정적 파일, 내부 API 등 모든 Next.js 요청 처리를 담당한다.
+
+3. `app.prepare()`
+    - Next.js가 내부적으로 빌드/준비 과정을 마치면 `then` 콜백이 실행된다.
+    - 준비가 완료된 다음 `createServer`로 Node HTTP 서버를 구동한다.
+
+4. `createServer((req, res) => { ... })`
+    - 들어오는 HTTP 요청을 `parse(req.url, true)`로 파싱하여 `handle`에 전달한다.
+    - 이 때 `parsedUrl`을 넘겨 주면 Next.js가 적절한 페이지 또는 정적 리소스를 반환한다.
+
+### 3.2 server.js 파일에 대한 주의점
+
+- `server.js`/`server.ts`는 Next.js 빌드 파이프라인을 거치지 않는다.
+- 따라서 **TypeScript를 그대로 실행하려면 별도의 런타임(ts-node 등) 설정이 필요**하고,
+- 일반 JS 파일이라면 **Node가 이해할 수 있는 문법만 사용해야 한다.**
+
+## 4. package.json 스크립트 설정
+
+커스텀 서버를 사용하려면 `package.json`의 스크립트를 다음과 같이 수정한다.
+
+```jsonc
+{
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "NODE_ENV=production node server.js"
+  }
+}
+```
+
+- `dev`: 개발 모드에서 커스텀 서버를 실행한다.
+- `build`: 기존과 동일하게 Next.js 빌드만 수행한다.
+- `start`: 프로덕션 모드에서 Node 서버(`server.js`)를 실행한다.
+
+> 참고: 개발 단계에서 코드 변경 시 자동 재시작이 필요하다면 `nodemon`을 함께 사용할 수 있다.  
+> 예: `"dev": "nodemon server.js"`
+
+## 5. next() 옵션 정리
+
+`import next from 'next'` 이후 호출하는 `next()` 함수는 다음과 같은 옵션 객체를 인자로 받을 수 있다.
+
+| 옵션 이름     | 타입                         | 설명                                                                 |
+|--------------|------------------------------|----------------------------------------------------------------------|
+| `conf`       | `Object`                     | `next.config.js`에 작성하는 설정 객체와 동일한 형태. 기본값 `{}`      |
+| `dev`        | `Boolean`                    | 개발 모드 여부. 기본값 `false`                                      |
+| `dir`        | `String`                     | Next.js 프로젝트 루트 경로. 기본값 `'.'`                            |
+| `quiet`      | `Boolean`                    | 서버 관련 에러 메시지 숨김 여부. 기본값 `false`                      |
+| `hostname`   | `String`                     | 서버가 동작하는 호스트 이름                                        |
+| `port`       | `Number`                     | 서버 포트 번호                                                      |
+| `httpServer` | `node:http#Server`           | 이미 생성된 HTTP 서버 인스턴스가 있다면 전달 가능                   |
+| `turbopack`  | `Boolean`                    | Turbopack 사용 여부(기본적으로 활성화)                              |
+| `webpack`    | `Boolean`                    | webpack 사용 여부                                                    |
+
+반환된 `app` 인스턴스는 다음과 같이 사용한다.
+
+- `app.prepare()` : Next.js 준비(빌드/초기화)
+- `app.getRequestHandler()` : HTTP 요청 처리를 담당하는 핸들러 반환
+- 이 핸들러를 Node 서버의 `request` 콜백에서 호출하여, 실제 라우팅과 렌더링을 Next.js에게 위임한다.
+
+## 6. 언제 Custom Server를 고려할지 정리
+
+**Custom Server를 고려해야 할 상황**
+
+- Next.js 파일 시스템 라우팅만으로는 처리하기 어려운 **특수한 라우팅 규칙**이 필요한 경우
+- 요청/응답 로깅, 모니터링, 메트릭 수집 등 **고급 미들웨어를 직접 제어**해야 하는 경우
+- 기존 레거시 서버 구조와 Next.js를 한 프로세스 안에서 **밀접하게 통합**해야 하는 경우
+
+**그 외 일반적인 경우**
+
+- App Router(`/app`)와 Route Handlers, Middleware, Proxy 설정 등으로 대부분의 요구 사항을 해결할 수 있다.
+- 가능하면 **내장 서버 + 공식 기능들을 우선 사용**하고, 정말 어쩔 수 없는 마지막 선택지로 Custom Server를 고려하는 것이 권장된다.

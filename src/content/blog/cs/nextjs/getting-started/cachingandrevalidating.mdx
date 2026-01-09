@@ -1,0 +1,382 @@
+---
+title: "Next.js Caching and Revalidating 정리"
+date: 2025-01-18
+summary: "Next.js Docs – Getting Started: **Caching and Revalidating** 내용을 기반으로, App Router 환경에서 캐싱과 재검증(revalidation) 개념 및 관련 API를 정리한 문서입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 9
+---
+
+# Next.js Caching and Revalidating 정리
+
+Next.js Docs – Getting Started: **Caching and Revalidating** 내용을 기반으로, App Router 환경에서 캐싱과 재검증(revalidation) 개념 및 관련 API를 정리한 문서입니다.
+
+---
+
+## 1. 개요
+
+이 문서에서 다루는 내용은 다음과 같습니다.
+
+- 캐싱(Caching)과 재검증(Revalidating) 개념
+- `fetch`의 캐싱 및 재검증 옵션
+- `cacheTag`를 사용한 컴포넌트/함수 수준 캐싱 태깅
+- `revalidateTag`, `updateTag`를 이용한 태그 기반 캐시 무효화
+- `revalidatePath`를 이용한 경로 기반 캐시 무효화
+- 레거시 API인 `unstable_cache` 개요 및 마이그레이션 방향
+
+Next.js App Router에서는 위 API들을 조합하여 **정적/동적/부분 프리렌더링**을 유연하게 섞어 사용할 수 있습니다.
+
+---
+
+## 2. 캐싱과 재검증 기본 개념
+
+### 2.1 캐싱(Caching)
+
+- **캐싱**은 데이터 패칭 및 기타 계산 결과를 저장해 두었다가,
+- 이후 동일한 요청이 들어왔을 때 **다시 계산하지 않고 저장된 결과를 재사용**하여 성능을 높이는 기술입니다.
+- 네트워크 지연, 데이터베이스 쿼리, 복잡한 연산 등이 반복되는 경우에 특히 중요합니다.
+
+### 2.2 재검증(Revalidating)
+
+- **재검증**은 이미 캐시된 데이터를 **전체 애플리케이션을 다시 빌드하지 않고** 갱신할 수 있게 해 주는 메커니즘입니다.
+- 예를 들어, 블로그 글을 수정했을 때,
+    - 전체 사이트를 다시 빌드하는 대신
+    - 해당 글이 포함된 페이지 또는 관련된 태그만 다시 갱신할 수 있습니다.
+
+### 2.3 이 문서에서 다루는 주요 API
+
+- `fetch` (확장된 Next.js `fetch`)
+- `cacheTag`
+- `revalidateTag`
+- `updateTag`
+- `revalidatePath`
+- `unstable_cache` (레거시, 향후 `use cache`로 대체 권장)
+
+---
+
+## 3. fetch – 요청 캐싱과 재검증
+
+### 3.1 기본 동작
+
+기본적으로 Next.js의 `fetch` 요청은 **캐시되지 않습니다.**
+
+```tsx
+// app/page.tsx
+export default async function Page() {
+  const data = await fetch('https://...')
+  // ...
+}
+```
+
+다만, `fetch`가 캐시되지 않더라도 Next.js는 해당 라우트를 **프리렌더링(pre-render)** 하고, 그 결과 HTML을 캐시합니다.  
+즉, **데이터 응답은 캐시 안 해도 HTML은 캐시**되는 구조입니다.
+
+- 라우트를 항상 **동적(dynamic)** 으로 만들고 싶다면,
+    - 기존의 `dynamic = 'force-dynamic'` 대신
+    - 새로운 **`connection` API**를 사용하는 것이 권장됩니다.
+
+### 3.2 개별 요청 캐싱 – `cache: 'force-cache'`
+
+특정 `fetch` 호출에 대해 **요청 자체를 캐시**하려면 `cache` 옵션을 지정합니다.
+
+```tsx
+// app/page.tsx
+export default async function Page() {
+  const data = await fetch('https://...', { cache: 'force-cache' })
+  // ...
+}
+```
+
+- 이 경우, **Data Cache**에 응답이 저장되어,
+    - 같은 URL + 옵션으로 호출 시
+    - 캐시에서 데이터를 재사용합니다.
+
+### 3.3 시간 기반 재검증 – `next.revalidate`
+
+`next.revalidate` 옵션을 사용하면 **시간(초 단위) 기반 재검증**을 설정할 수 있습니다.
+
+```tsx
+// app/page.tsx
+export default async function Page() {
+  const data = await fetch('https://...', {
+    next: { revalidate: 3600 }, // 1시간마다 재검증
+  })
+  // ...
+}
+```
+
+- 최초 요청 시:
+    - 실제 원본 데이터(fetch) 호출 후 결과를 캐시합니다.
+- 1시간 이내의 요청:
+    - 캐시된 데이터를 그대로 사용합니다.
+- 1시간이 지난 뒤 첫 요청:
+    - 백그라운드 또는 다음 요청 타이밍에 **재검증 로직**이 실행되어
+    - 캐시가 갱신됩니다.
+
+> 일반적으로 너무 짧은 주기(예: 1초)보다는, 몇 분~몇 시간 단위의 재검증 주기를 설정하고,  
+> 보다 세밀한 경우에는 **온디맨드(on-demand) revalidation**을 함께 사용하는 것이 좋습니다.
+
+### 3.4 태그 기반 캐시 – `next.tags`
+
+`fetch` 호출에 **태그**를 달아두면, 나중에 `revalidateTag` 또는 `updateTag`로 **해당 태그에 연결된 캐시를 한 번에 무효화**할 수 있습니다.
+
+```tsx
+// app/lib/data.ts
+export async function getUserById(id: string) {
+  const data = await fetch(`https://...`, {
+    next: {
+      tags: ['user'], // 태그 부여
+    },
+  })
+
+  return data.json()
+}
+```
+
+- 여러 `fetch` 호출에 같은 태그를 달면,
+    - `revalidateTag('user')` 한 번으로 **관련 데이터 전체**를 재검증할 수 있습니다.
+
+---
+
+## 4. cacheTag – Cache Components와 함께 쓰는 태그 지정
+
+`cacheTag`는 **Cache Components + `use cache` 지시문**과 함께 사용하여,  
+`fetch` 외의 작업에도 태그 기반 캐싱/재검증을 적용할 수 있게 해 줍니다.
+
+### 4.1 cacheTag의 역할
+
+- 기존에는 태그 기반 캐시가 **`fetch`에만** 적용되었습니다.
+- `cacheTag`를 사용하면 다음과 같은 작업에도 태깅이 가능합니다.
+    - 데이터베이스 쿼리
+    - 파일 시스템 접근
+    - 기타 서버 사이드 연산
+
+```tsx
+// app/lib/data.ts
+import { cacheTag } from 'next/cache'
+
+export async function getProducts() {
+  'use cache'          // 이 함수 결과를 캐시
+  cacheTag('products') // 이 캐시에 'products' 태그 부여
+
+  const products = await db.query('SELECT * FROM products')
+  return products
+}
+```
+
+- 이렇게 태그를 달아두면, 이후에
+    - `revalidateTag('products')`
+    - `updateTag('products')`
+      로 관련 캐시를 무효화할 수 있습니다.
+
+### 4.2 정리
+
+- `cacheTag`는 **Cache Components**와 `use cache`를 전제로 합니다.
+- `fetch` 이외의 모든 서버 작업에 대해 **태그 기반 캐시 전략**을 적용하고 싶을 때 사용합니다.
+
+---
+
+## 5. revalidateTag – 태그 기반 재검증
+
+`revalidateTag`는 **특정 태그를 가진 캐시 항목들을 재검증**하는 함수입니다.
+
+### 5.1 동작 모드
+
+현재 `revalidateTag`는 두 가지 동작 모드를 지원합니다.
+
+1. `revalidateTag('user', 'max')`  
+   → **stale-while-revalidate** 동작
+    - 이전 캐시(약간 오래된 데이터)를 **바로 응답으로 보내면서**,
+    - 백그라운드에서 새로운 데이터를 가져와 캐시를 갱신합니다.
+
+2. `revalidateTag('user')` (두 번째 인자 없음)  
+   → 이전 **레거시 동작**으로, 캐시를 즉시 만료하는 방식 (Deprecated)
+
+실무에서는 **`profile="max"` 모드 사용이 권장**됩니다.
+
+### 5.2 사용 위치
+
+- `revalidateTag`는 다음에서 사용할 수 있습니다.
+    - **Route Handler (`app/api/.../route.ts`)**
+    - **Server Action**
+
+예시:
+
+```tsx
+// app/lib/actions.ts
+import { revalidateTag } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // 1) DB 등의 실제 데이터 수정
+  // ...
+
+  // 2) 태그 기반으로 캐시 재검증
+  revalidateTag('user', 'max')
+}
+```
+
+- 여러 함수/컴포넌트에서 같은 태그를 사용하면,
+    - `revalidateTag('user', 'max')` 한 번으로 모든 관련 캐시를 재검증할 수 있습니다.
+
+---
+
+## 6. updateTag – Server Action 전용 즉시 무효화
+
+`updateTag`는 **Server Action 내에서만 사용 가능한 API**로,  
+**read-your-own-writes** 시나리오를 위해 **즉시 캐시를 만료**시키는 데 사용됩니다.
+
+### 6.1 동작 특징
+
+- 사용 위치: **Server Action 내에서만 사용 가능**
+- 효과: 캐시를 **즉시 만료**시켜, 다음 읽기에서 **새로운 데이터가 바로 보이도록** 보장
+- `revalidateTag`와 달리 `profile` 옵션 없이 **곧바로 무효화**합니다.
+
+예시:
+
+```tsx
+// app/lib/actions.ts
+import { updateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  // 1) 게시글 생성
+  const post = await db.post.create({
+    data: {
+      title: formData.get('title'),
+      content: formData.get('content'),
+    },
+  })
+
+  // 2) 관련 태그 즉시 만료
+  updateTag('posts')              // 목록 캐시
+  updateTag(`post-${post.id}`)    // 상세 캐시
+
+  // 3) 새로 생성된 글로 리다이렉트
+  redirect(`/posts/${post.id}`)
+}
+```
+
+### 6.2 revalidateTag와의 비교
+
+- `updateTag`
+    - Server Actions에서만 사용 가능
+    - 캐시를 **즉시(explicit) 만료**
+    - 주로 “내가 방금 쓴 데이터는 바로 보고 싶다”는 상황 (read-your-own-writes)에 사용
+- `revalidateTag`
+    - Server Actions + Route Handlers에서 사용 가능
+    - `profile="max"`와 함께 쓰면 **stale-while-revalidate**로 동작
+    - 다수의 클라이언트에 대해 점진적/안정적인 캐시 갱신이 필요한 경우에 사용
+
+---
+
+## 7. revalidatePath – 경로 기반 재검증
+
+`revalidatePath`는 **특정 라우트 경로**에 대한 캐시를 재검증하는 함수입니다.
+
+### 7.1 사용 위치 및 예제
+
+- 사용 위치:
+    - Route Handler
+    - Server Action
+
+```tsx
+// app/lib/actions.ts
+import { revalidatePath } from 'next/cache'
+
+export async function updateUser(id: string) {
+  // 1) 데이터 수정
+  // ...
+
+  // 2) /profile 경로의 캐시 재검증
+  revalidatePath('/profile')
+}
+```
+
+- 해당 경로(`/profile`)가 정적으로 프리렌더 되어 있었다면,
+    - 다음 요청 시 새로운 데이터로 페이지가 다시 렌더링되고,
+    - 결과 HTML과 RSC Payload가 새로 캐시됩니다.
+
+### 7.2 태그 기반과의 조합
+
+- **경로 단위로 전체를 다시 그리고 싶다면** → `revalidatePath`
+- **여러 경로에 걸쳐 있는 데이터 단위로 관리하고 싶다면** → `revalidateTag` / `updateTag`
+
+실제 프로젝트에서는 보통:
+
+- “특정 상세 페이지 전체를 새로 렌더링” → `revalidatePath`
+- “여러 페이지에서 공통으로 사용하는 리스트/요약 정보 갱신” → `revalidateTag`
+
+이렇게 역할을 구분해서 사용하는 패턴이 많습니다.
+
+---
+
+## 8. unstable_cache – 레거시 캐시 래퍼
+
+`unstable_cache`는 **레거시 캐싱 API**입니다.  
+현재는 **Cache Components + `use cache` 지시문**으로의 전환이 권장됩니다.
+
+### 8.1 기본 사용 예
+
+```tsx
+// app/lib/data.ts
+import { db } from '@/lib/db'
+
+export async function getUserById(id: string) {
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.id, id))
+    .then((res) => res[0])
+}
+```
+
+```tsx
+// app/page.tsx
+import { unstable_cache } from 'next/cache'
+import { getUserById } from '@/app/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ userId: string }>
+}) {
+  const { userId } = await params
+
+  const getCachedUser = unstable_cache(
+    async () => {
+      return getUserById(userId)
+    },
+    [userId] // 캐시 키
+  )
+
+  const user = await getCachedUser()
+  // ...
+}
+```
+
+### 8.2 재검증 옵션
+
+세 번째 인자로 캐시 재검증 옵션을 전달할 수 있습니다.
+
+```tsx
+const getCachedUser = unstable_cache(
+  async () => {
+    return getUserById(userId)
+  },
+  [userId],
+  {
+    tags: ['user'],    // 태그 기반 재검증
+    revalidate: 3600,  // 1시간마다 재검증
+  }
+)
+```
+
+### 8.3 마이그레이션 방향
+
+- 신규 프로젝트나 새로운 코드에서는:
+    - **Cache Components 활성화 + `use cache` + `cacheTag`** 패턴을 사용하는 것이 권장됩니다.
+- 기존 `unstable_cache` 사용 코드는:
+    - 점진적으로 `use cache` 기반 캐싱으로 옮겨가는 것이 좋습니다.
+
+---

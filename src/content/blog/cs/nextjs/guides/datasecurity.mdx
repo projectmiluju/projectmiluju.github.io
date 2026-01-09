@@ -1,0 +1,305 @@
+---
+title: "Next.js Data Security 가이드 정리"
+date: 2025-02-20
+summary: "- React Server Components(RSC)는 성능과 데이터 패칭 구조를 단순화하지만, **데이터를 어디서/어떻게 접근하는지가 기존 프런트엔드 앱과 달라지기 때문에 보안 관점에서의 사고방식도 바뀌어야 한다.**"
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 9
+---
+
+# Next.js Data Security 가이드 정리
+
+## 1. 개요
+
+- React Server Components(RSC)는 성능과 데이터 패칭 구조를 단순화하지만, **데이터를 어디서/어떻게 접근하는지가 기존 프런트엔드 앱과 달라지기 때문에 보안 관점에서의 사고방식도 바뀌어야 한다.**
+- 이 문서는 Next.js에서 데이터를 안전하게 다루기 위한 **전반적인 보안 베스트 프랙티스**를 정리한다.
+
+---
+
+## 2. 데이터 패칭(Data Fetching) 접근 방식
+
+Next.js에서는 프로젝트의 규모와 성숙도에 따라 **3가지 데이터 접근 패턴**을 추천한다.
+
+1. **External HTTP APIs**
+2. **Data Access Layer (DAL)**
+3. **Component-level Data Access**
+
+가급적 **한 가지 접근 방식을 선택하여 일관되게 사용하는 것**이 보안 감사 및 유지보수 관점에서 유리하다.
+
+### 2.1 External HTTP APIs
+
+- 기존에 REST, GraphQL 등의 백엔드 API가 이미 존재하는 경우:
+    - Server Component에서도 `fetch`로 기존 API를 호출하면 된다.
+    - Zero Trust 모델을 적용해, **서버 간 통신에서도 인증/인가를 명시적으로 처리**하는 것을 권장한다.
+- 예시:
+    - `cookies()`에서 인증 토큰을 읽어와, 외부 API 요청 시 헤더/쿠키로 전달하는 패턴.
+
+**언제 적합한가**
+
+- 이미 성숙한 보안 체계를 가진 백엔드가 존재하는 경우
+- 백엔드 팀이 별도의 언어/환경에서 API를 관리하는 조직
+
+### 2.2 Data Access Layer (DAL)
+
+**새로운 프로젝트에 권장되는 패턴**으로, 내부에 **데이터 접근 전용 라이브러리**를 두고 모든 데이터 입출력을 중앙 관리한다.
+
+DAL의 특징
+
+- **오직 서버에서만 실행**되어야 한다.
+- 모든 데이터 접근 전에 **인증/인가(Authorization) 체크**를 수행해야 한다.
+- 컴포넌트에 전달할 때는 **최소한의 필드만 포함된 DTO(Data Transfer Object)**로 변환해서 반환해야 한다.
+- React의 `cache()`와 `cookies()` 등을 활용해, 동일 요청 내에서 공유 가능한 인메모리 캐시를 제공할 수 있다.
+
+이점
+
+- 모든 데이터 접근 로직이 한 곳에 모이므로 **보안 정책을 일관되게 적용**할 수 있다.
+- 실수로 민감 데이터가 클라이언트로 흘러 들어가는 위험을 줄인다.
+- 환경변수(`process.env`) 사용을 DAL 내부로 한정함으로써, 비밀키 노출 가능성을 줄인다.
+
+### 2.3 Component-level Data Access
+
+- 빠른 프로토타입, 학습용 예제에서는 **Server Component 안에서 직접 DB 쿼리를 호출**하는 것이 가능하다.
+- 하지만 다음과 같은 위험이 있다.
+    - 전체 DB Row를 그대로 Client Component에 props로 전달하는 경우, **민감한 모든 필드가 클라이언트로 노출**될 수 있다.
+- 안전하게 사용하려면:
+    - Server Component가 DB에서 데이터를 읽더라도, **Client Component로 전달하기 전에 공개 가능한 최소 필드만 추려서 새 객체를 만들어 전달**해야 한다.
+
+---
+
+## 3. 데이터 읽기 (Reading Data)
+
+### 3.1 서버 → 클라이언트 데이터 전달 구조
+
+- 초기 렌더링 시, Server Component와 Client Component 모두 서버에서 HTML 생성을 위해 실행되지만 **서로 다른 모듈 시스템에서 동작**한다.
+- 보안 기본 전제:
+
+  **Server Components**
+
+    - 서버에서만 실행된다.
+    - 환경 변수, 비밀키, DB, 내부 API 등 **민감 자원에 직접 접근 가능**하다.
+
+  **Client Components**
+
+    - 서버에서 프리렌더링 시에도 실행되지만, 보안 관점에서는 **브라우저에서 실행되는 코드와 동일한 가정**을 적용해야 한다.
+    - 비밀 정보나 서버 전용 모듈에 접근해서는 안 된다.
+
+- 구조 자체는 안전하도록 설계되어 있지만, **데이터를 어떻게 패칭하고 어떤 props를 전달하는지에 따라 민감 정보가 노출될 수 있다.**
+
+### 3.2 Tainting(오염 표시) 기능
+
+- 민감 데이터가 Client Component로 잘못 전달되는 것을 막기 위한 React의 실험적 기능.
+- 사용 방법:
+    - `experimental_taintObjectReference`
+    - `experimental_taintUniqueValue`
+- Next.js에서는 `next.config.js`에서 아래와 같이 활성화할 수 있다.
+
+```js
+// next.config.js
+module.exports = {
+  experimental: {
+    taint: true,
+  },
+}
+```
+
+- Taint된 값은 클라이언트로 전달이 차단된다.
+- 다만 **추가적인 방어막일 뿐**, DAL에서 데이터를 DTO 수준으로 필터링/정제하는 기본 원칙은 여전히 필요하다.
+
+### 3.3 서버 전용 코드의 클라이언트 실행 방지 (`server-only`)
+
+- 특허 알고리즘, 내부 비즈니스 로직, DB 레이어 등은 클라이언트 번들에 포함되면 안 된다.
+- [`server-only`](https://www.npmjs.com/package/server-only) 패키지를 사용해, 특정 모듈을 **서버에서만 import 가능**하도록 강제할 수 있다.
+
+```bash
+pnpm add server-only
+```
+
+```ts
+// lib/data.ts
+import 'server-only'
+
+// 서버 전용 데이터 로직
+```
+
+- 이 모듈을 Client Component에서 import하려고 하면 빌드 에러가 발생하므로, **서버 전용 코드가 클라이언트로 새어나가는 것을 방지**할 수 있다.
+
+---
+
+## 4. 데이터 수정(Mutating Data)와 Server Actions 보안
+
+### 4.1 Server Actions 개요
+
+- Next.js는 폼 제출, 데이터 변경, 로그아웃 등 **서버 변이를 처리하는 기본 메커니즘으로 Server Actions를 사용**한다.
+- `use server` 지시어를 사용하면 해당 함수는 자동으로 서버 액션이 되며, **공개 HTTP 엔드포인트**처럼 동작한다.
+
+### 4.2 내장 보안 기능
+
+1. **Secure Action IDs**
+    - 컴파일 시, 각 Server Action에 대해 **암호화된 비결정적 ID**를 생성한다.
+    - 이 ID는 최대 14일 동안 캐시되고, 새 빌드나 빌드 캐시 무효화 시 다시 생성된다.
+    - 인증 계층이 누락된 경우 위험을 줄이는 데 도움을 주지만, 여전히 **Server Action은 공개 엔드포인트처럼 다뤄야 한다.**
+
+2. **Dead Code Elimination**
+    - 코드 상에 정의만 되어 있고 실제로 사용되지 않는 Server Action은 빌드 과정에서 제거된다.
+    - 이렇게 제거된 액션은 HTTP로 접근 가능한 엔드포인트로 노출되지 않는다.
+
+### 4.3 클라이언트 입력 검증
+
+- 클라이언트에서 들어오는 값(폼 데이터, URL 파라미터, `searchParams`, 헤더 등)은 언제든 조작될 수 있다.
+- 나쁜 예시:
+    - `searchParams.get('isAdmin') === 'true'`를 그대로 신뢰하여 관리자 권한을 부여하는 코드
+- 좋은 예시:
+    - 서버에서 쿠키/토큰을 다시 검증하고, **항상 서버 기준으로 권한을 재확인**한 뒤 결과를 사용한다.
+
+### 4.4 인증(Authentication) & 인가(Authorization)
+
+- Server Action에서 민감 작업을 수행하기 전에 항상:
+
+    1. 사용자 인증 상태 확인 (`auth()` 등)
+    2. 권한(역할, 소유자 여부 등) 검증
+
+- 조건을 만족하지 않으면 예외를 던져 작업을 중단하는 패턴을 사용한다.
+
+---
+
+## 5. 클로저(Closures)와 암호화
+
+### 5.1 클로저 기반 Server Action
+
+- 컴포넌트 내부에 Server Action을 정의하면, 해당 액션은 컴포넌트의 **외부 스코프 변수에 접근할 수 있는 클로저**가 된다.
+
+```tsx
+export default async function Page() {
+  const publishVersion = await getLatestVersion()
+
+  async function publish() {
+    'use server'
+    if (publishVersion !== await getLatestVersion()) {
+      throw new Error('The version has changed since pressing publish')
+    }
+    // ...
+  }
+
+  return (
+    <form>
+      <button formAction={publish}>Publish</button>
+    </form>
+  )
+}
+```
+
+- 이 경우 `publishVersion` 값은 액션 호출 시점을 위해 클라이언트 → 서버로 다시 전달되어야 한다.
+
+### 5.2 클로저 캡처 값 암호화
+
+- 민감 데이터가 그대로 노출되지 않도록, Next.js는 **클로저에 캡처된 값들을 자동으로 암호화**한다.
+- 각 빌드마다 새로운 비밀키가 생성되며, 그 빌드에서만 해당 액션을 호출할 수 있다.
+- 단, 암호화에만 의존하면 안 되며, **애초에 클라이언트로 보낼 필요가 없는 정보는 클로저에 포함시키지 않는 것이 최선**이다.
+
+### 5.3 암호키 재정의 (고급 설정)
+
+- 여러 서버 인스턴스로 셀프 호스팅하는 경우, 서버마다 다른 암호키를 가지면 일관성이 깨질 수 있다.
+- 이를 방지하기 위해 `process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` 환경변수로 **암호키를 직접 지정**할 수 있다.
+    - AES-GCM 형식이어야 하며, 키 회전/서명 등 일반적인 보안 모범 사례도 함께 고려해야 한다.
+
+---
+
+## 6. Allowed Origins (고급 설정)과 CSRF 방어
+
+- Server Actions는 `<form>`을 통해 호출되므로, 이론적으로 **CSRF 공격에 노출될 수 있는 표면**을 가진다.
+- Next.js는 다음과 같은 방식으로 이를 완화한다.
+
+1. **HTTP 메서드 제한**
+    - Server Actions는 내부적으로 `POST` 메서드만 허용한다.
+    - 최신 브라우저에서 기본 활성화된 `SameSite` 쿠키 정책과 함께 CSRF 위험을 상당 부분 줄인다.
+
+2. **Origin / Host 헤더 비교**
+    - 서버는 `Origin` 헤더와 `Host`(또는 `X-Forwarded-Host`) 헤더를 비교한다.
+    - 값이 일치하지 않는 경우 요청을 거부한다.
+    - 즉, Server Action은 **해당 페이지를 호스팅하는 동일 호스트에서만 호출**될 수 있다.
+
+3. **serverActions.allowedOrigins 옵션**
+    - 리버스 프록시나 다단계 백엔드 구조를 사용하는 대규모 앱에서는, 실제 호출 도메인이 프로덕션 도메인과 다를 수 있다.
+    - 이 경우 `next.config.js`의 `experimental.serverActions.allowedOrigins` 옵션에 **허용할 오리진 목록**을 명시한다.
+
+```js
+// next.config.js
+/** @type {import('next').NextConfig} */
+module.exports = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['my-proxy.com', '*.my-proxy.com'],
+    },
+  },
+}
+```
+
+---
+
+## 7. 렌더링 중 부작용(Side-effects) 방지
+
+- 사용자 로그아웃, DB 업데이트, 캐시 무효화 등 **상태를 변경하는 작업은 컴포넌트 렌더링 과정에서 수행해서는 안 된다.**
+- Next.js는 이를 방지하기 위해:
+    - 렌더링 중 `cookies()` 수정
+    - 렌더링 중 캐시 재검증(revalidation)  
+      등을 제한한다.
+
+잘못된 예시
+
+```tsx
+// BAD: 렌더링 과정에서 로그아웃 처리
+export default async function Page({ searchParams }) {
+  if (searchParams.get('logout')) {
+    cookies().delete('AUTH_TOKEN')
+  }
+
+  return <UserProfile />
+}
+```
+
+권장되는 패턴
+
+```tsx
+// GOOD: Server Action으로 변이 처리
+import { logout } from './actions'
+
+export default function Page() {
+  return (
+    <>
+      <UserProfile />
+      <form action={logout}>
+        <button type="submit">Logout</button>
+      </form>
+    </>
+  )
+}
+```
+
+- 변이는 항상 **Server Action 또는 명시적인 API 엔드포인트**에서 처리하도록 설계해야 한다.
+
+---
+
+## 8. 보안 감사(Auditing) 체크리스트
+
+Next.js 프로젝트 보안 점검 시 특히 주의 깊게 볼 항목:
+
+1. **Data Access Layer**
+    - DAL이 분리되어 있는가?
+    - DB 클라이언트, `process.env` 접근이 DAL 밖에서 사용되고 있지는 않은가?
+
+2. **`"use client"` 파일**
+    - 클라이언트 컴포넌트의 props가 과도하게 넓은 타입(예: 전체 User 객체)을 요구하지는 않는가?
+    - 민감 정보(토큰, 이메일, 전화번호, 내부 ID 등)를 직접 props로 받는 구조가 있는가?
+
+3. **`"use server"` 파일**
+    - Server Action의 인자에 대해 유효성 검사가 충분히 수행되고 있는가?
+    - 각 액션에서 사용자 인증/인가를 재검증하고 있는가?
+
+4. **동적 라우트 (`/[param]/`)**
+    - URL 파라미터가 검증/정규화/인코딩 없이 직접 쿼리나 응답에 사용되고 있지 않은가?
+
+5. **`proxy.ts`, `route.ts`**
+    - 프록시, 라우트 핸들러는 권한과 데이터 흐름을 크게 제어할 수 있으므로, **전통적인 웹 보안 테스트 기법(침투 테스트, 취약점 스캐닝 등)**으로 별도 점검하는 것이 좋다.
+
+---

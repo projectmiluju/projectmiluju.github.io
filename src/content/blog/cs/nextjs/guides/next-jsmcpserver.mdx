@@ -1,0 +1,74 @@
+---
+title: "Next.js App Router Guide: MCP (Next.js MCP Server)"
+date: 2025-01-31
+summary: "**Model Context Protocol (MCP)** 는 AI 에이전트/코딩 어시스턴트가 애플리케이션과 상호작용하기 위한 **표준 인터페이스(오픈 표준)** 입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 20
+---
+
+# Next.js App Router Guide: MCP (Next.js MCP Server)
+
+## MCP란?
+**Model Context Protocol (MCP)** 는 AI 에이전트/코딩 어시스턴트가 애플리케이션과 상호작용하기 위한 **표준 인터페이스(오픈 표준)** 입니다.
+
+Next.js는 **v16+** 에서 개발 서버 내부에 MCP 엔드포인트를 제공해, 에이전트가 프로젝트의 “실시간 상태/내부 정보”에 접근할 수 있게 합니다.
+
+## 시작하기 (Getting started)
+### 요구사항
+- Next.js 16 이상
+
+### 1) `.mcp.json` 추가
+프로젝트 루트에 `.mcp.json` 파일을 만들고 `next-devtools-mcp`를 등록합니다.
+
+```json
+{
+  "mcpServers": {
+    "next-devtools": {
+      "command": "npx",
+      "args": ["-y", "next-devtools-mcp@latest"]
+    }
+  }
+}
+```
+
+### 2) dev 서버 실행
+```bash
+npm run dev
+```
+
+`next-devtools-mcp`가 실행 중인 Next.js 인스턴스를 자동으로 발견/연결합니다.
+
+## 개발 워크플로우(가이드 요약)
+1. `npm run dev`로 개발 서버 실행
+2. 코딩 에이전트가 `next-devtools-mcp`를 통해 실행 중인 Next.js에 연결
+3. 브라우저로 앱을 열어 실제 페이지를 확인
+4. 에이전트에게 진단/인사이트 질문 (에러, 라우트, 메타데이터 등)
+
+## Available tools (에이전트가 사용할 수 있는 도구)
+가이드는 `next-devtools-mcp`를 통해 에이전트가 다음 도구들을 사용할 수 있다고 설명합니다.
+
+- `get_errors`: 빌드/런타임/타입 에러 조회
+- `get_logs`: 브라우저 콘솔 로그/서버 출력이 담긴 dev 로그 파일 경로 조회
+- `get_page_metadata`: 특정 페이지의 라우트/컴포넌트/렌더링 정보 조회
+- `get_project_metadata`: 프로젝트 구조, 설정, dev server URL 조회
+- `get_server_action_by_id`: Server Actions ID로 소스 파일/함수 이름 찾기
+
+## 에이전트 개발에 도움이 되는 점(요약)
+- 프로젝트 구조를 이해한 상태에서 “어디에 무엇을 추가할지” 제안
+- 개발 중 실제 설정/라우트/미들웨어 상태를 질의
+- App Router의 페이지/레이아웃 렌더링 관계를 더 정확히 이해
+- 프로젝트 패턴/컨벤션을 더 잘 따르는 코드 생성
+
+## 동작 원리(How it works)
+- Next.js 16+ dev 서버 내부에 `/_next/mcp` 엔드포인트가 존재
+- `next-devtools-mcp`가 이를 자동으로 발견하고 통신
+- 여러 Next.js 인스턴스(다른 포트)도 연결/포워딩 가능
+
+## Troubleshooting (MCP server not connecting)
+- Next.js 버전이 16+인지 확인
+- `.mcp.json`에 `next-devtools-mcp` 설정이 있는지 확인
+- dev 서버가 실행 중인지 확인 (`npm run dev`)
+- 이미 실행 중이었다면 dev 서버 재시작
+- 사용 중인 코딩 에이전트가 MCP 서버 설정을 로드했는지 확인

@@ -1,0 +1,425 @@
+---
+title: "Next.js Updating Data 정리"
+date: 2025-01-17
+summary: "Next.js Docs – Getting Started: **Updating Data** 내용을 기반으로, App Router 환경에서 데이터를 **변경(mutate)** 하는 방법을 정리한 문서입니다. citeturn2view0"
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 8
+---
+
+# Next.js Updating Data 정리
+
+Next.js Docs – Getting Started: **Updating Data** 내용을 기반으로, App Router 환경에서 데이터를 **변경(mutate)** 하는 방법을 정리한 문서입니다. citeturn2view0
+
+---
+
+## 1. 개요
+
+이 문서는 Next.js에서 **React Server Functions(= Server Actions)** 를 사용하여 데이터를 업데이트하는 방법을 설명합니다. 주요 내용은 다음과 같습니다.
+
+- Server Functions / Server Actions 개념
+- Server / Client Component에서 Server Function 사용 방법
+- `form`과 이벤트 핸들러를 통한 호출 패턴
+- `useActionState`를 이용한 pending 상태 표시
+- 업데이트 이후 **refresh / revalidate / redirect / cookies** 처리
+- `useEffect`로 Server Action을 트리거하는 패턴
+
+> 이 문서는 **App Router + React Server Components** 환경을 전제로 합니다.
+
+---
+
+## 2. Server Functions / Server Actions 개념
+
+### 2.1 Server Function이란?
+
+- **Server Function**은 **서버에서 실행되는 비동기 함수**입니다.
+- 클라이언트에서 호출될 때는 네트워크 요청을 통해 실행되므로, **반드시 `async` 함수**여야 합니다. citeturn2view0
+- 데이터 변경(등록/수정/삭제)와 같은 **mutation** 상황에서는 흔히 **Server Action**이라고 부릅니다.
+
+### 2.2 Server Action 관례
+
+- Server Action은 일반적으로 **`startTransition`과 함께 사용하는 비동기 함수**입니다.
+- 다음과 같이 React가 자동으로 transition으로 처리하는 경우가 있습니다. citeturn2view0
+    - `<form>`의 `action` prop에 전달
+    - `<button>`의 `formAction` prop에 전달
+
+### 2.3 Next.js 캐시와 통합
+
+- Server Action은 Next.js의 **캐싱 아키텍처와 통합**됩니다.
+- 하나의 Server Action 호출로
+    - **변경된 데이터**와
+    - **업데이트된 UI**
+      를 한 번의 요청/응답에서 함께 반환할 수 있습니다.
+- 내부적으로 Server Action은 항상 **`POST` 메서드**를 사용하며, 이 메서드로만 호출할 수 있습니다. citeturn2view0
+
+---
+
+## 3. Server Functions 생성 방식
+
+### 3.1 `"use server"` 지시문
+
+Server Function을 정의하려면 **`"use server"` directive** 를 사용합니다. 사용 위치에 따라 두 가지 방식이 있습니다. citeturn2view0
+
+1. **함수 안에서 사용** – 해당 함수만 Server Function으로 지정
+2. **파일 최상단에 사용** – 해당 파일의 **모든 export 함수**가 Server Function이 됨
+
+```tsx
+// app/lib/actions.ts
+export async function createPost(formData: FormData) {
+  'use server'
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // TODO: 데이터 저장 로직
+  // TODO: 캐시 무효화(revalidate)
+}
+
+export async function deletePost(formData: FormData) {
+  'use server'
+  const id = formData.get('id')
+
+  // TODO: 데이터 삭제 로직
+  // TODO: 캐시 무효화(revalidate)
+}
+```
+
+### 3.2 Server Component에서 인라인 정의
+
+Server Component 안에서 **로컬 함수 형태**로 Server Action을 정의할 수도 있습니다. citeturn2view0
+
+```tsx
+// app/page.tsx
+export default function Page() {
+  // Server Action
+  async function createPost(formData: FormData) {
+    'use server'
+    // TODO: 데이터 변경
+  }
+
+  return (
+    <main>
+      {/* 이 안에서 createPost를 action으로 넘길 수 있음 */}
+    </main>
+  )
+}
+```
+
+> 참고: Server Component는 **기본적으로 점진적 향상(Progressive Enhancement)** 을 지원하므로, JavaScript가 아직 로드되지 않았거나 꺼져 있어도 **Server Action을 사용하는 폼 제출은 동작**합니다. citeturn2view0
+
+### 3.3 Client Component에서 사용하기
+
+Client Component 안에서는 **Server Function을 정의할 수는 없고**, **이미 정의된 Server Function을 가져와서 호출만** 할 수 있습니다. citeturn2view0
+
+```tsx
+// app/actions.ts
+'use server'
+
+export async function createPost() {
+  // TODO: 서버에서 실행되는 로직
+}
+```
+
+```tsx
+// app/ui/button.tsx
+'use client'
+
+import { createPost } from '@/app/actions'
+
+export function Button() {
+  return <button formAction={createPost}>Create</button>
+}
+```
+
+> 참고: Client Component에서 폼이 Server Action을 호출하는 경우, **JS가 아직 로드되지 않았을 때 제출 요청을 큐에 쌓았다가** 우선적으로 하이드레이션 후 처리합니다. 이때 브라우저가 새로고침 없이 요청을 보냅니다. citeturn2view0
+
+### 3.4 액션을 props로 전달하기
+
+Server Component에서 Server Action을 정의한 뒤, **Client Component로 props 형태로 전달**할 수 있습니다. citeturn2view0
+
+```tsx
+// Server Component 안
+<ClientComponent updateItemAction={updateItem} />
+```
+
+```tsx
+// app/client-component.tsx
+'use client'
+
+export default function ClientComponent({
+  updateItemAction,
+}: {
+  updateItemAction: (formData: FormData) => void
+}) {
+  return <form action={updateItemAction}>{/* ... */}</form>
+}
+```
+
+---
+
+## 4. Server Functions 호출 방식
+
+문서에서는 Server Function 호출 방법을 **두 가지**로 정리합니다. citeturn2view0
+
+1. **폼(Form)을 통한 호출** (Server / Client Component 모두)
+2. **이벤트 핸들러 및 `useEffect`를 통한 호출** (Client Component)
+
+> 참고: Server Functions는 기본적으로 **서버 측 mutation용**입니다. 현재는 클라이언트가 이를 **한 번에 하나씩 순차적으로** 보내도록 설계되어 있습니다. 병렬 처리가 필요하면
+> - Server Component에서 **데이터 패칭**을 병렬로 수행하거나,
+> - 하나의 Server Function 또는 **Route Handler** 내부에서 병렬 작업을 처리하는 방식이 권장됩니다. citeturn2view0
+
+### 4.1 Form을 사용한 호출
+
+React는 HTML `<form>` 요소에 **`action` prop**을 추가하여, Server Function을 바로 연결할 수 있도록 확장합니다. 이때 Server Function은 **자동으로 `FormData` 객체를 인자로 받습니다. citeturn2view0**
+
+```tsx
+// app/ui/form.tsx
+import { createPost } from '@/app/actions'
+
+export function Form() {
+  return (
+    <form action={createPost}>
+      <input type="text" name="title" />
+      <input type="text" name="content" />
+      <button type="submit">Create</button>
+    </form>
+  )
+}
+```
+
+```tsx
+// app/actions.ts
+'use server'
+
+export async function createPost(formData: FormData) {
+  const title = formData.get('title')
+  const content = formData.get('content')
+
+  // TODO: title, content를 이용해 데이터 저장
+  // TODO: revalidatePath 등으로 캐시 무효화
+}
+```
+
+- `form` 내부의 `name` 속성을 기준으로 `FormData`에서 값을 꺼낼 수 있습니다.
+- 브라우저의 기본 `FormData` API를 그대로 사용합니다.
+
+### 4.2 이벤트 핸들러를 통한 호출
+
+Client Component에서 **`onClick` 같은 이벤트 핸들러** 안에서 Server Function을 직접 호출할 수도 있습니다. citeturn2view0
+
+```tsx
+// app/like-button.tsx
+'use client'
+
+import { incrementLike } from './actions'
+import { useState } from 'react'
+
+export default function LikeButton({ initialLikes }: { initialLikes: number }) {
+  const [likes, setLikes] = useState(initialLikes)
+
+  return (
+    <>
+      <p>Total Likes: {likes}</p>
+      <button
+        onClick={async () => {
+          const updatedLikes = await incrementLike()
+          setLikes(updatedLikes)
+        }}
+      >
+        Like
+      </button>
+    </>
+  )
+}
+```
+
+- 이 경우에는 `FormData` 대신, **Server Function의 반환값**을 사용하여 로컬 상태를 업데이트합니다.
+- 낙관적 업데이트(optimistic UI) 패턴과도 잘 어울립니다.
+
+### 4.3 `useEffect`를 사용한 자동 호출
+
+`useEffect`를 사용해 **컴포넌트 마운트 시점 또는 특정 의존성 변경 시점에 Server Action을 자동 호출**할 수 있습니다. citeturn2view0
+
+예: 페이지 뷰 카운트를 자동으로 증가시키는 경우
+
+```tsx
+// app/view-count.tsx
+'use client'
+
+import { incrementViews } from './actions'
+import { useState, useEffect, useTransition } from 'react'
+
+export default function ViewCount({ initialViews }: { initialViews: number }) {
+  const [views, setViews] = useState(initialViews)
+  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    startTransition(async () => {
+      const updatedViews = await incrementViews()
+      setViews(updatedViews)
+    })
+  }, [])
+
+  // isPending을 이용해 로딩 UI를 보여줄 수도 있음
+  return <p>Total Views: {views}</p>
+}
+```
+
+- 전역 이벤트(단축키, IntersectionObserver 기반 무한 스크롤, 최초 진입 시 로그 기록 등)에 반응하여 **자동 mutation**을 수행할 때 유용합니다.
+
+---
+
+## 5. 예제: pending 상태 표시
+
+Server Function 실행 중에 **로딩 상태**를 보여주고 싶다면, React의 `useActionState` 훅을 사용할 수 있습니다. 이 훅은 `[state, action, pending]` 형태의 값을 반환합니다. citeturn2view0
+
+```tsx
+// app/ui/button.tsx
+'use client'
+
+import { useActionState, startTransition } from 'react'
+import { createPost } from '@/app/actions'
+import { LoadingSpinner } from '@/app/ui/loading-spinner'
+
+export function Button() {
+  const [state, action, pending] = useActionState(createPost, null)
+
+  return (
+    <button onClick={() => startTransition(action)}>
+      {pending ? <LoadingSpinner /> : 'Create Post'}
+    </button>
+  )
+}
+```
+
+- `pending === true` 인 동안 스피너나 비활성화된 버튼 상태 등을 보여줄 수 있습니다.
+- `useActionState`는 Server Action과 React transition을 자연스럽게 묶어 줍니다.
+
+---
+
+## 6. 업데이트 이후 처리: Refresh / Revalidate / Redirect
+
+데이터가 변경된 뒤에는 **UI와 캐시를 어떻게 갱신할 것인지**가 중요합니다. 문서에서는 다음 세 가지를 다룹니다. citeturn2view0
+
+1. `refresh()` – 현재 페이지 라우터 새로고침
+2. `revalidatePath`, `revalidateTag` – Data Cache 무효화
+3. `redirect()` – 다른 페이지로 이동
+
+### 6.1 `refresh()` – 라우터 새로고침
+
+`refresh`는 `next/cache`에서 가져오며, Server Action 안에서 호출할 수 있습니다. citeturn2view0
+
+```tsx
+// app/lib/actions.ts
+'use server'
+
+import { refresh } from 'next/cache'
+
+export async function updatePost(formData: FormData) {
+  // TODO: 데이터 변경 로직
+
+  refresh()
+}
+```
+
+- `refresh()`는 **클라이언트 라우터를 새로고침**하여, 현재 페이지가 최신 데이터를 반영하도록 만듭니다.
+- 단, `refresh`는 **태그 기반 캐시를 재검증하지는 않습니다.** 태그 캐시를 재검증하려면 `updateTag` 또는 `revalidateTag`를 사용해야 합니다.
+
+### 6.2 `revalidatePath` / `revalidateTag` – 캐시 재검증
+
+데이터를 변경한 뒤, Next.js Data Cache를 재검증하고 싶다면 **Server Function 안에서** `revalidatePath` 혹은 `revalidateTag`를 호출합니다. citeturn2view0
+
+```tsx
+// app/lib/actions.ts
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  'use server'
+  // TODO: 데이터 저장
+
+  // /posts 경로에 대한 데이터 캐시 재검증
+  revalidatePath('/posts')
+}
+```
+
+- `revalidatePath('/posts')`  
+  → `/posts` 경로 및 관련 세그먼트를 다시 렌더링하도록 캐시를 무효화합니다.
+- `revalidateTag('post')`  
+  → 특정 태그를 기준으로 캐시를 관리할 때 사용합니다.
+
+### 6.3 `redirect()` – 업데이트 후 리다이렉트
+
+데이터 변경 후 **다른 페이지로 이동**하고 싶을 때는 `redirect`를 사용합니다. citeturn2view0
+
+```tsx
+// app/lib/actions.ts
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createPost(formData: FormData) {
+  // TODO: 데이터 저장
+
+  revalidatePath('/posts')
+  redirect('/posts')
+}
+```
+
+- `redirect()`는 내부적으로 **제어 흐름 예외(control-flow exception)** 를 발생시켜, 호출 이후의 코드는 실행되지 않습니다.
+- 새로고침 없이 **서버 측에서 리다이렉트 응답**을 만들어 클라이언트로 전달합니다.
+- 최신 데이터가 필요하다면, **반드시 `redirect` 이전에 `revalidatePath` 혹은 `revalidateTag`를 호출**해야 합니다.
+
+---
+
+## 7. Cookies와 Server Actions
+
+Server Action 내부에서 `cookies()` API를 사용하면 쿠키를 읽고/쓰기/삭제할 수 있습니다. citeturn2view0
+
+```tsx
+// app/actions.ts
+'use server'
+
+import { cookies } from 'next/headers'
+
+export async function exampleAction() {
+  const cookieStore = await cookies()
+
+  // 쿠키 조회
+  const value = cookieStore.get('name')?.value
+
+  // 쿠키 설정
+  cookieStore.set('name', 'Delba')
+
+  // 쿠키 삭제
+  cookieStore.delete('name')
+}
+```
+
+- Server Action에서 쿠키를 **설정하거나 삭제**하면, Next.js는 **현재 페이지와 레이아웃을 서버에서 다시 렌더링**하여 변경된 쿠키 값을 UI에 반영합니다. citeturn2view0
+- 이때
+    - 필요한 컴포넌트는 다시 렌더링 / 마운트 / 언마운트되며,
+    - **클라이언트 상태는 가능한 한 보존**됩니다.
+    - 의존성이 바뀐 `useEffect` 등은 다시 실행됩니다.
+
+쿠키 기반 A/B 테스트, 다크 모드 설정, 언어 설정 등과 잘 어울리는 패턴입니다.
+
+---
+
+## 8. `useEffect`로 Server Action 트리거하기
+
+문서 마지막 예제는 `useEffect`를 사용해, 컴포넌트 마운트 시 Server Action을 호출하여 뷰 카운트를 증가시키는 코드입니다. citeturn2view0
+
+핵심 포인트는 다음과 같습니다.
+
+- `useEffect`는 **Client Component**에서만 사용 가능하므로, 해당 컴포넌트는 `'use client'`여야 합니다.
+- `useTransition`과 함께 사용하면, **상태 업데이트를 낮은 우선순위로 처리**하면서도 UI를 부드럽게 유지할 수 있습니다.
+- `isPending`을 이용해 로딩 상태를 UI에 반영할 수 있습니다.
+
+이 패턴은 다음과 같은 경우에 유용합니다.
+
+- 페이지 진입 시 자동으로 **조회수 증가** 기록
+- 특정 키 입력 / 스크롤 위치 / 뷰포트 진입 등 글로벌 이벤트에 반응하는 **자동 mutation**
+- 주기적으로 상태를 동기화하는 기능 등
+
+---

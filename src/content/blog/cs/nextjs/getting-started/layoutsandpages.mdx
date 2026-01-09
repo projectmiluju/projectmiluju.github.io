@@ -1,0 +1,337 @@
+---
+title: "Next.js 레이아웃과 페이지 (Layouts and Pages)"
+date: 2025-01-12
+summary: "Next.js 공식 문서 **Getting Started: Layouts and Pages** 내용을 바탕으로, App Router 기준의 레이아웃·페이지 개념을 정리한 자료입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 3
+---
+
+# Next.js 레이아웃과 페이지 (Layouts and Pages)
+
+Next.js 공식 문서 **Getting Started: Layouts and Pages** 내용을 바탕으로, App Router 기준의 레이아웃·페이지 개념을 정리한 자료입니다.
+
+---
+
+## 1. 페이지 생성 (Creating a page)
+
+- **페이지(page)**는 특정 경로(route)에 대응하는 UI입니다.
+- `app` 디렉터리 안에 **`page.tsx` 파일을 만들고 기본 내보내기(default export)**로 React 컴포넌트를 작성합니다.
+- 예: 루트 경로(`/`)에 대응하는 페이지
+
+```tsx
+// app/page.tsx
+export default function Page() {
+  return <h1>Hello Next.js!</h1>
+}
+```
+
+> 정리: `app/경로/page.tsx` 파일이 있으면 해당 경로가 “공개 라우트”가 됩니다.
+
+---
+
+## 2. 레이아웃 생성 (Creating a layout)
+
+- **레이아웃(layout)**은 여러 페이지에서 **공유되는 UI**입니다.
+- 페이지 간 이동 시:
+  - 레이아웃은 **상태(state)를 유지**하고,
+  - **인터랙티브한 상태를 유지**하며,
+  - 불필요하게 다시 렌더링되지 않습니다.
+- `layout` 파일에서 기본 내보내기하는 React 컴포넌트가 레이아웃이 되며, **`children` props**를 받아 그 위치에 하위 페이지/레이아웃을 렌더링합니다.
+
+```tsx
+// app/layout.tsx (루트 레이아웃 예시)
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        {/* 공통 레이아웃 UI */}
+        <main>{children}</main>
+      </body>
+    </html>
+  )
+}
+```
+
+### 2.1 루트 레이아웃 (Root layout)
+
+- `app` 디렉터리 **최상단에 있는 `app/layout.tsx`**를 **루트 레이아웃(root layout)**이라고 부릅니다.
+- 루트 레이아웃은 **필수**이며, 반드시 `<html>`과 `<body>` 태그를 포함해야 합니다.
+- 전역 폰트, 전역 스타일, 공통 헤더/푸터 등을 여기에서 설정합니다.
+
+---
+
+## 3. 중첩 라우트 생성 (Creating a nested route)
+
+**중첩 라우트(nested route)**는 여러 개의 URL 세그먼트로 이루어진 경로입니다.
+예: `/blog/[slug]` 는 다음 세 부분으로 구성됩니다.
+
+- `/` : 루트 세그먼트
+- `blog` : 중간 세그먼트
+- `[slug]` : 말단(leaf) 세그먼트
+
+Next.js App Router에서:
+
+- **폴더**는 URL 세그먼트와 1:1로 매핑됩니다.
+- **파일(`page`, `layout` 등)**은 해당 세그먼트에서 실제로 렌더링되는 UI를 정의합니다.
+
+### 3.1 `/blog` 라우트 만들기
+
+```text
+app/
+  blog/
+    page.tsx
+```
+
+```tsx
+// app/blog/page.tsx
+import { getPosts } from '@/lib/posts'
+import { Post } from '@/ui/post'
+
+export default async function Page() {
+  const posts = await getPosts()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <Post key={post.id} post={post} />
+      ))}
+    </ul>
+  )
+}
+```
+
+- `app/blog/page.tsx` → 경로: `/blog`
+
+### 3.2 `/blog/[slug]` 라우트 만들기
+
+```text
+app/
+  blog/
+    page.tsx
+    [slug]/
+      page.tsx
+```
+
+```tsx
+// app/blog/[slug]/page.tsx
+export default function Page() {
+  return <h1>Hello, Blog Post Page!</h1>
+}
+```
+
+- `app/blog/[slug]/page.tsx` → 경로 예시: `/blog/my-post`
+
+> `[slug]`와 같이 폴더 이름을 대괄호로 감싸면 **동적 라우트 세그먼트(dynamic route segment)**가 됩니다.
+
+---
+
+## 4. 레이아웃 중첩 (Nesting layouts)
+
+레이아웃은 **폴더 구조에 따라 자동으로 중첩**됩니다.
+즉, 상위 폴더의 레이아웃이 하위 폴더의 레이아웃·페이지를 `children`으로 감싸는 구조입니다.
+
+### 4.1 `/blog` 전용 레이아웃 만들기
+
+```text
+app/
+  layout.tsx          // 루트 레이아웃
+  blog/
+    layout.tsx        // 블로그 전용 레이아웃
+    page.tsx
+    [slug]/
+      page.tsx
+```
+
+```tsx
+// app/blog/layout.tsx
+export default function BlogLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <section>{children}</section>
+}
+```
+
+- 실제 렌더링 계층은 다음과 같이 구성됩니다.
+  - `app/layout.tsx` (루트 레이아웃)
+    - `app/blog/layout.tsx` (블로그 레이아웃)
+      - `app/blog/page.tsx` 또는 `app/blog/[slug]/page.tsx` (페이지)
+
+> 정리: 상위 폴더에 `layout.tsx`가 있으면, 그 아래 폴더들에 대한 공통 레이아웃이 됩니다.
+
+---
+
+## 5. 동적 세그먼트 생성 (Creating a dynamic segment)
+
+**동적 세그먼트(dynamic segment)**는 데이터 기반으로 여러 페이지를 자동 생성할 때 사용합니다.
+예: 블로그 글 목록, 상품 상세 페이지 등.
+
+- 폴더 이름을 `[segmentName]` 형태로 작성합니다.
+- 예: `app/blog/[slug]/page.tsx`에서 `[slug]`가 동적 세그먼트입니다.
+
+```tsx
+// app/blog/[slug]/page.tsx
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = await getPost(slug)
+
+  return (
+    <div>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </div>
+  )
+}
+```
+
+- `params`에는 URL 세그먼트의 값이 담기며, 타입은 `Promise<{ slug: string }>` 형태로 정의되어 있습니다.
+- 동적 세그먼트와 `params`에 대한 더 자세한 내용은 **Dynamic Segments 문서**에서 다룹니다.
+
+또한, 동적 세그먼트 안에 중첩된 **레이아웃**도 `params`에 접근할 수 있습니다.
+
+---
+
+## 6. searchParams로 렌더링 (Rendering with search params)
+
+Server Component 페이지에서는 **`searchParams` props**를 통해 쿼리 스트링(search parameters)에 접근할 수 있습니다.
+
+```tsx
+// app/page.tsx
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const filters = (await searchParams).filters
+  // filters 값을 이용해 필터링, 페이징 등 처리
+}
+```
+
+- `searchParams`를 사용하면 **요청(request)에 따라 값을 읽어야 하므로, 해당 페이지는 동적 렌더링(dynamic rendering)**으로 분류됩니다.
+- 클라이언트 컴포넌트에서는 `useSearchParams` 훅을 사용하여 검색 파라미터를 읽을 수 있습니다.
+
+### 6.1 무엇을 언제 사용할까? (What to use and when)
+
+- **`searchParams` props 사용**
+  - 검색 파라미터가 **데이터 로딩에 직접 영향**을 줄 때
+  - 예: DB 조회용 필터, 페이지네이션 등
+
+- **`useSearchParams` 훅 사용**
+  - 이미 props로 받아온 데이터에 대해 **클라이언트에서만 필터링**할 때
+  - 예: 정렬/필터 UI만 클라이언트에서 동작하는 경우
+
+- **소규모 최적화 팁**
+  - 단순히 이벤트 핸들러 내부에서만 검색 파라미터가 필요할 경우
+  - `new URLSearchParams(window.location.search)`를 사용해 리렌더링 없이 값을 읽는 것도 가능
+
+---
+
+## 7. 페이지 간 링크 (Linking between pages)
+
+Next.js에서는 **`next/link`의 `<Link>` 컴포넌트**로 경로 간 네비게이션을 구현합니다.
+
+- `<Link>`는 HTML `<a>` 태그를 확장한 컴포넌트입니다.
+- **prefetching**, **클라이언트 사이드 네비게이션**을 지원합니다.
+
+```tsx
+// app/ui/post.tsx (예시)
+import Link from 'next/link'
+
+export default async function PostList() {
+  const posts = await getPosts()
+
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.slug}>
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+> 참고: 일반적인 페이지 이동은 `<Link>`로 처리하고, 보다 세밀한 제어가 필요할 때는 `useRouter` 훅을 사용할 수 있습니다.
+
+---
+
+## 8. Route Props Helpers
+
+Next.js는 라우트 구조를 바탕으로 `params`, named slots 등을 **타입 수준에서 자동으로 추론하는 유틸리티 타입**을 제공합니다.
+
+- `PageProps`
+  - `page` 컴포넌트용 props 타입
+  - `params`, `searchParams`를 포함
+
+- `LayoutProps`
+  - `layout` 컴포넌트용 props 타입
+  - `children`과 병렬 라우트 슬롯(예: `@analytics`) 등을 포함
+
+```tsx
+// app/blog/[slug]/page.tsx
+export default async function Page(props: PageProps<'/blog/[slug]'>) {
+  const { slug } = await props.params
+  return <h1>Blog post: {slug}</h1>
+}
+
+// app/dashboard/layout.tsx
+export default function Layout(props: LayoutProps<'/dashboard'>) {
+  return (
+    <section>
+      {props.children}
+      {/* app/dashboard/@analytics 가 있다면 props.analytics 슬롯으로 접근 가능 */}
+    </section>
+  )
+}
+```
+
+### 8.1 특징 정리
+
+- 정적 라우트의 `params`는 자동으로 `{}` 타입이 됩니다.
+- `PageProps`, `LayoutProps`는 **전역 타입(helper)**이므로 별도 import가 필요 없습니다.
+- 타입 생성 시점
+  - `next dev`
+  - `next build`
+  - `next typegen` 실행 시 자동 생성
+
+---
+
+## 9. 전체 흐름 요약
+
+1. **`page.tsx`**
+   - 특정 URL에 대응하는 페이지 UI를 정의합니다.
+
+2. **`layout.tsx`**
+   - 여러 페이지에서 공유하는 UI를 정의합니다.
+   - 폴더 구조에 따라 자동으로 중첩되며, 전역(루트) 레이아웃은 필수입니다.
+
+3. **폴더 구조**
+   - 폴더 = URL 세그먼트
+   - `page`, `layout` 파일이 실제 렌더링되는 UI를 정의합니다.
+
+4. **동적 세그먼트 + `params`**
+   - `[slug]` 형태의 폴더로 데이터 기반 라우트를 만들고,
+   - `params` props로 세그먼트 값을 읽어옵니다.
+
+5. **`searchParams` / `useSearchParams`**
+   - 서버/클라이언트 각각에서 검색 파라미터를 다루는 방법을 제공합니다.
+
+6. **`<Link>`**
+   - 라우트 간 이동 시 기본적으로 사용하는 네비게이션 컴포넌트입니다.
+
+7. **Route Props Helpers**
+   - `PageProps`, `LayoutProps`로 라우트별 props 타입을 안전하게 관리할 수 있습니다.
+
+

@@ -1,0 +1,516 @@
+---
+title: "Next.js Fetching Data 정리"
+date: 2025-01-16
+summary: "Next.js Docs – Getting Started: Fetching Data 내용을 기반으로, App Router 환경에서의 데이터 패칭 패턴을 정리한 문서입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 7
+---
+
+# Next.js Fetching Data 정리
+
+Next.js Docs – Getting Started: Fetching Data 내용을 기반으로, App Router 환경에서의 데이터 패칭 패턴을 정리한 문서입니다.
+
+---
+
+## 1. 개요
+
+이 문서는 다음 내용을 다룹니다.
+
+- Server Component에서 데이터 가져오기
+- Client Component에서 데이터 가져오기
+- `fetch` 요청 중복 제거 및 데이터 캐시
+- 스트리밍(Streaming) 렌더링
+- 순차 / 병렬 / 프리로드 패턴 예시
+
+> 이 문서는 **App Router + React Server Components**를 전제로 합니다.
+
+---
+
+## 2. Server Components에서 데이터 가져오기
+
+### 2.1 사용 가능한 비동기 I/O 종류
+
+Server Component는 서버에서 실행되므로, 다음과 같은 **어떤 비동기 I/O**도 사용할 수 있습니다.
+
+1. `fetch` API
+2. ORM 또는 데이터베이스 클라이언트
+3. Node.js `fs` 등 파일 시스템 접근
+
+### 2.2 `fetch` API로 데이터 가져오기
+
+컴포넌트를 `async` 함수로 선언하고, 내부에서 `fetch`를 `await` 하면 됩니다.
+
+```tsx
+// app/blog/page.tsx
+export default async function Page() {
+  const res = await fetch('https://api.vercel.app/blog')
+  const posts = await res.json()
+
+  return (
+    <ul>
+      {posts.map((post: { id: string; title: string }) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+**알아두면 좋은 점**
+
+- `fetch` 응답 자체는 기본적으로 **캐시되지 않습니다.**
+- 하지만 Next.js는 라우트를 **사전 렌더링(pre-render)** 하고, 그 **렌더링 결과를 캐시**하여 성능을 높입니다.
+- 동적 렌더링으로 전환하려면 `fetch` 옵션에 `{ cache: 'no-store' }`를 사용하면 됩니다.
+- 개발 환경에서는 `fetch` 로그를 콘솔에 출력하도록 설정할 수 있습니다.
+
+### 2.3 ORM 또는 데이터베이스 사용
+
+Server Component에서는 데이터베이스 클라이언트를 직접 사용할 수 있습니다. 마찬가지로 컴포넌트를 `async` 함수로 만들고, 쿼리 결과를 `await` 하면 됩니다.
+
+```tsx
+// app/blog/page.tsx
+import { db, posts } from '@/lib/db'
+
+export default async function Page() {
+  const allPosts = await db.select().from(posts)
+
+  return (
+    <ul>
+      {allPosts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+- 데이터베이스 비밀번호 등 **민감한 정보**는 서버에서만 사용되며, 클라이언트로 노출되지 않습니다.
+- 복잡한 비즈니스 로직을 Server Component에 두고, 클라이언트에는 **렌더링에 필요한 결과만 전달**하는 구조를 만들 수 있습니다.
+
+---
+
+## 3. Client Components에서 데이터 가져오기
+
+Client Component에서 데이터를 가져오는 방법은 크게 두 가지입니다.
+
+1. React의 `use` 훅을 활용하여 **서버에서 전달된 Promise를 읽는 방법**
+2. SWR / React Query와 같은 **커뮤니티 라이브러리 사용**
+
+### 3.1 `use` 훅과 스트리밍
+
+React의 `use` 훅을 사용하면, **서버에서 생성한 Promise를 클라이언트에서 읽어오는 방식으로 스트리밍**을 구현할 수 있습니다.
+
+#### 1단계: Server Component에서 Promise 생성 후 전달
+
+```tsx
+// app/blog/page.tsx
+import Posts from '@/app/ui/posts'
+import { Suspense } from 'react'
+
+// 서버에서 데이터 패칭 (Promise 반환)
+function getPosts() {
+  return fetch('https://api.vercel.app/blog').then((res) => res.json())
+}
+
+export default function Page() {
+  // 여기서는 await 하지 않고 Promise 그대로 넘김
+  const posts = getPosts()
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Posts posts={posts} />
+    </Suspense>
+  )
+}
+```
+
+#### 2단계: Client Component에서 `use`로 Promise 읽기
+
+```tsx
+// app/ui/posts.tsx
+'use client'
+
+import { use } from 'react'
+
+export default function Posts({
+  posts,
+}: {
+  posts: Promise<{ id: string; title: string }[]>
+}) {
+  const allPosts = use(posts)
+
+  return (
+    <ul>
+      {allPosts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+- `<Posts>`는 `<Suspense>`로 감싸져 있으므로, Promise가 resolve되는 동안 **fallback UI**가 표시됩니다.
+- 데이터가 준비되면, 해당 부분만 스트리밍되어 교체됩니다.
+
+### 3.2 커뮤니티 라이브러리(SWR, React Query)
+
+Client Component에서 전통적인 방식으로 데이터를 가져오고 싶다면, **SWR** 또는 **React Query** 같은 라이브러리를 사용할 수 있습니다.
+
+예: SWR 사용
+
+```tsx
+// app/blog/page.tsx
+'use client'
+
+import useSWR from 'swr'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+export default function BlogPage() {
+  const { data, error, isLoading } = useSWR(
+    'https://api.vercel.app/blog',
+    fetcher
+  )
+
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+
+  return (
+    <ul>
+      {data.map((post: { id: string; title: string }) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+- 이 방식은 **완전한 클라이언트 사이드 패칭**으로, 기존 SPA와 유사한 패턴입니다.
+- 캐싱, 리페치, 폴링 등은 SWR/React Query가 자체적으로 처리합니다.
+
+---
+
+## 4. 요청 중복 제거 및 데이터 캐시
+
+Next.js는 두 가지 레벨에서 요청 중복을 줄이고 캐시를 제공합니다.
+
+1. **Request memoization (요청 메모이제이션)**
+2. **Data Cache** 및 `React.cache`
+
+### 4.1 Request memoization
+
+- 하나의 **렌더링 패스 내에서**, 동일한 URL + 옵션으로 실행된 `GET` / `HEAD` `fetch` 요청은 **자동으로 하나로 합쳐집니다.**
+- 이 동작을 **비활성화**하려면 `fetch`에 `AbortSignal`을 전달하여 opt-out 할 수 있습니다.
+- 메모이제이션 범위는 **각 요청(request)의 수명**으로 제한됩니다.
+
+### 4.2 Data Cache (Next.js 데이터 캐시)
+
+- `fetch` 옵션에 `cache: 'force-cache'` 등을 사용하면, Next.js의 **Data Cache**를 사용할 수 있습니다.
+- 이 캐시는
+    - 현재 렌더링 패스 뿐 아니라,
+    - **향후 들어오는 요청들에도 데이터 재사용**을 가능하게 합니다.
+
+### 4.3 ORM / DB를 위한 `React.cache`
+
+`fetch`가 아닌 ORM / DB 클라이언트를 직접 쓰는 경우에는 React의 `cache` 함수를 사용하여 동일한 효과를 얻을 수 있습니다.
+
+```tsx
+// app/lib/data.ts
+import { cache } from 'react'
+import { db, posts, eq } from '@/lib/db'
+
+export const getPost = cache(async (id: string) => {
+  const post = await db.query.posts.findFirst({
+    where: eq(posts.id, parseInt(id, 10)),
+  })
+  return post
+})
+```
+
+- 동일한 인자로 `getPost`를 여러 번 호출해도, 캐시를 통해 중복 쿼리를 줄일 수 있습니다.
+- `cache`는 인자 값을 기준으로 내부적으로 메모이제이션을 수행합니다.
+
+---
+
+## 5. 스트리밍(Streaming)
+
+> ⚠️ 주의: 여기 내용은 `next.config.(js|ts)`에서 `cacheComponents` 옵션이 **활성화된 상태**를 전제로 합니다. (Next.js 15에서 도입)
+
+Server Component에서 데이터를 가져올 때, **느린 데이터 요청 하나 때문에 전체 페이지 렌더링이 지연**될 수 있습니다. 이를 개선하기 위해 **Streaming**을 사용합니다.
+
+- HTML을 **작은 청크로 나누어** 서버 → 클라이언트로 점진적으로 전송합니다.
+- 사용자는 먼저 레이아웃 / 상단 UI 등을 보고, 이후 느린 부분이 준비되는 대로 채워지는 경험을 하게 됩니다.
+
+스트리밍을 사용하는 방법은 두 가지입니다.
+
+1. `loading.js` 파일 사용 (라우트 단위)
+2. `<Suspense>` 사용 (컴포넌트 단위)
+
+### 5.1 `loading.js`로 라우트 전체 스트리밍
+
+특정 라우트(예: `app/blog/page.tsx`)에 대해 **페이지 전체에 대한 로딩 UI**를 정의하려면, 같은 폴더에 `loading.tsx` 파일을 추가합니다.
+
+```tsx
+// app/blog/loading.tsx
+export default function Loading() {
+  // 여기에서 전체 페이지의 로딩 상태 UI를 정의
+  return <div>Loading...</div>
+}
+```
+
+동작 방식:
+
+- 내비게이션 시, 사용자는 **레이아웃 + 로딩 UI**를 즉시 보게 됩니다.
+- 서버에서 페이지 렌더링이 완료되면, 로딩 UI가 실제 콘텐츠로 자동 교체됩니다.
+- 내부적으로는 `loading.tsx`가 `layout.tsx` 안에서 `page.tsx`를 `<Suspense>`로 감싸는 구조처럼 동작합니다.
+
+이 방식은 **레이아웃 / 페이지 단위**로 스트리밍할 때 적합합니다.
+
+### 5.2 `<Suspense>`로 부분적인 스트리밍
+
+더 세밀하게 제어하고 싶다면, 특정 컴포넌트를 `<Suspense>`로 감싸면 됩니다.
+
+```tsx
+// app/blog/page.tsx
+import { Suspense } from 'react'
+import BlogList from '@/components/BlogList'
+import BlogListSkeleton from '@/components/BlogListSkeleton'
+
+export default function BlogPage() {
+  return (
+    <div>
+      {/* 이 영역은 즉시 클라이언트로 전송됨 */}
+      <header>
+        <h1>Welcome to the Blog</h1>
+        <p>Read the latest posts below.</p>
+      </header>
+
+      <main>
+        {/* 내부에 동적 콘텐츠가 있다면, 이 boundary 안에서 스트리밍됨 */}
+        <Suspense fallback={<BlogListSkeleton />}>
+          <BlogList />
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+```
+
+- `<Suspense>` 밖의 콘텐츠는 **바로 렌더링**되고,
+- `<Suspense>` 안의 내용은 데이터 준비가 끝나는 즉시 스트리밍되어 채워집니다.
+
+### 5.3 의미 있는 로딩 상태 만들기
+
+좋은 사용자 경험을 위해서는 단순한 `Loading...` 텍스트보다는, 다음과 같이 **의미 있는 로딩 UI**가 권장됩니다.
+
+- 스켈레톤 UI (카드 틀, 리스트 틀 등)
+- 스피너 + 간단한 안내 문구
+- 미래 화면 일부(예: 타이틀, 썸네일 자리 등)를 미리 보여주는 형태
+
+개발 환경에서는 **React DevTools**를 사용해 각 컴포넌트의 로딩 상태를 미리 확인할 수 있습니다.
+
+---
+
+## 6. 예시 패턴
+
+### 6.1 순차 데이터 패칭 (Sequential fetching)
+
+하나의 요청 결과가 다른 요청의 입력으로 필요한 경우, **요청 간에 의존성이 생기면서 순차 실행**이 됩니다.
+
+예시: 아티스트 정보 → 플레이리스트
+
+```tsx
+// app/artist/[username]/page.tsx
+import { Suspense } from 'react'
+
+async function getArtist(username: string) {
+  // 아티스트 정보 패칭
+}
+
+async function getArtistPlaylists(artistId: string) {
+  // 플레이리스트 패칭
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}) {
+  const { username } = await params
+
+  // 1) 먼저 아티스트 정보
+  const artist = await getArtist(username)
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+
+      {/* 2) 아티스트 ID를 기반으로 Playlists 컴포넌트 렌더링 */}
+      <Suspense fallback={<div>Loading...</div>}>
+        <Playlists artistId={artist.id} />
+      </Suspense>
+    </>
+  )
+}
+
+async function Playlists({ artistId }: { artistId: string }) {
+  const playlists = await getArtistPlaylists(artistId)
+
+  return (
+    <ul>
+      {playlists.map((playlist) => (
+        <li key={playlist.id}>{playlist.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+- `<Playlists>`는 `<Suspense>`로 감싸져 있어 **스트리밍**되지만,
+- 페이지 전체는 **아티스트 데이터가 준비될 때까지는 렌더링을 시작할 수 없습니다.**
+
+개선 방안:
+
+- 페이지 전체를 `loading.tsx` 또는 상위 `<Suspense>`로 감싸, **최초 진입 시 전체 로딩 UI를 즉시 보여주기**
+- 첫 요청(아티스트 정보)이 병목이 되지 않도록, 가능한 한 **응답 시간을 최적화하거나, 캐시를 활용**하기
+
+### 6.2 병렬 데이터 패칭 (Parallel fetching)
+
+기본적으로 App Router에서는 **레이아웃과 페이지 세그먼트가 병렬로 렌더링**됩니다.  
+하지만 하나의 컴포넌트 내부에서 `await`를 연속해서 사용하면, 다음처럼 **의도치 않게 순차 실행**이 될 수 있습니다.
+
+```tsx
+// app/artist/[username]/page.tsx
+import { getArtist, getAlbums } from '@/app/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}) {
+  const { username } = await params
+
+  // 잘못된 예: 순차 요청
+  const artist = await getArtist(username)
+  const albums = await getAlbums(username)
+
+  return <div>{artist.name}</div>
+}
+```
+
+위 코드는 다음 순서로 동작합니다.
+
+1. `getArtist(username)` 요청
+2. 응답 완료 후,
+3. `getAlbums(username)` 요청 시작
+
+두 요청을 **병렬로 시작**하려면, 먼저 Promise를 생성하고 나중에 `await` 합니다.
+
+```tsx
+// app/artist/[username]/page.tsx
+import Albums from './albums'
+
+async function getArtist(username: string) {
+  const res = await fetch(`https://api.example.com/artist/${username}`)
+  return res.json()
+}
+
+async function getAlbums(username: string) {
+  const res = await fetch(
+    `https://api.example.com/artist/${username}/albums`
+  )
+  return res.json()
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ username: string }>
+}) {
+  const { username } = await params
+
+  // 1) 요청을 먼저 시작
+  const artistData = getArtist(username)
+  const albumsData = getAlbums(username)
+
+  // 2) 이후 한 번에 기다림
+  const [artist, albums] = await Promise.all([artistData, albumsData])
+
+  return (
+    <>
+      <h1>{artist.name}</h1>
+      <Albums list={albums} />
+    </>
+  )
+}
+```
+
+- 이 패턴은 API 요청이 여러 개 있을 때 **전체 응답 시간을 크게 줄일 수 있는 기본 패턴**입니다.
+- 한 요청이 실패하면 전체가 실패한다는 점에 유의해야 하며, 필요하다면 `Promise.allSettled`로 각 결과를 개별적으로 처리할 수 있습니다.
+
+### 6.3 데이터 프리로드 (Preloading data)
+
+프리로드는 **나중에 필요할 데이터를 미리 요청**해 두는 패턴입니다.
+
+예: 특정 아이템이 사용 가능(available)한 경우에만 렌더링하는 페이지
+
+```tsx
+// app/item/[id]/page.tsx
+import { getItem, checkIsAvailable } from '@/lib/data'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
+  // 1) Item 데이터 미리 로드 시작
+  preload(id)
+
+  // 2) 다른 비동기 작업 수행
+  const isAvailable = await checkIsAvailable()
+
+  // 3) 실제 렌더링 시에는 이미 getItem 호출이 시작된 상태
+  return isAvailable ? <Item id={id} /> : null
+}
+
+const preload = (id: string) => {
+  // void 연산자를 써서 반환값을 무시하며, 비동기 작업만 시작
+  void getItem(id)
+}
+
+export async function Item({ id }: { id: string }) {
+  const result = await getItem(id)
+  // ...
+  return <div>{result.name}</div>
+}
+```
+
+조금 더 발전된 형태로, React의 `cache` + `server-only`를 사용해 **서버 전용 캐시 유틸리티**를 만들 수 있습니다.
+
+```tsx
+// utils/get-item.ts
+import { cache } from 'react'
+import 'server-only'
+import { getItem as getItemFromDb } from '@/lib/data'
+
+// 프리로드용 함수
+export const preload = (id: string) => {
+  void getItem(id)
+}
+
+// 서버 전용 캐시 함수
+export const getItem = cache(async (id: string) => {
+  const item = await getItemFromDb(id)
+  return item
+})
+```
+
+- 이렇게 만들어 두면, 어디서든 `preload(id)` / `getItem(id)`를 재사용하면서
+    - 동일 인자에 대한 중복 쿼리를 줄이고,
+    - 항상 서버에서만 실행되도록 보장할 수 있습니다.
+
+---

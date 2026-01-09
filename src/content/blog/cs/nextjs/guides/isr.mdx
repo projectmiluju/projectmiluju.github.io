@@ -1,0 +1,208 @@
+---
+title: "Next.js Incremental Static Regeneration (ISR) 가이드 정리 (App Router)"
+date: 2025-01-24
+summary: "**Incremental Static Regeneration (ISR)** 은 “정적 페이지(SSG)의 장점”을 유지하면서,"
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 14
+---
+
+# Next.js Incremental Static Regeneration (ISR) 가이드 정리 (App Router)
+
+## 1. ISR 개요
+
+**Incremental Static Regeneration (ISR)** 은 “정적 페이지(SSG)의 장점”을 유지하면서,
+**전체 재빌드 없이 런타임에 정적 페이지를 갱신**할 수 있게 해주는 기능입니다.
+
+ISR로 가능한 것:
+
+- 전체 사이트를 다시 빌드하지 않고도 **정적 콘텐츠 업데이트**
+- 대부분 요청은 캐시된 정적 HTML을 서빙해서 **서버 부하 감소**
+- 페이지에 맞는 `cache-control` 헤더를 자동으로 설정
+- 콘텐츠 페이지가 많아도 `next build` 시간이 과도하게 늘지 않도록 대응
+
+---
+
+## 2. Step 1: 시간 기반(Time-based) ISR 설정하기
+
+App Router에서 시간 기반 ISR은 라우트 파일에 아래처럼 `revalidate` 값을 export 해서 설정합니다.
+
+```ts
+// app/blog/[id]/page.tsx (예시)
+export const revalidate = 60
+```
+
+동작 개념은 다음과 같습니다.
+
+1. `next build` 시점에 가능한 페이지들을 미리 생성
+2. 해당 페이지 요청은 캐시되어 빠르게 응답
+3. `revalidate` 시간이 지난 뒤 **다음 요청**이 오면,
+    - 우선 기존(stale) 캐시를 즉시 응답하고
+    - 동시에 백그라운드에서 새 페이지를 생성
+4. 새 페이지 생성이 성공하면, 이후 요청부터 최신 캐시를 서빙
+
+---
+
+## 3. Step 2: `generateStaticParams` + on-demand 생성
+
+동적 라우트에서 빌드 시점에 “알려진 params”를 미리 생성하려면 `generateStaticParams()`를 사용합니다.
+
+```ts
+interface Post {
+  id: string
+  title: string
+  content: string
+}
+
+export const revalidate = 60
+
+export async function generateStaticParams() {
+  const posts: Post[] = await fetch('https://api.vercel.app/blog').then((res) => res.json())
+  return posts.map((post) => ({ id: String(post.id) }))
+}
+```
+
+추가로, “빌드 시점에 몰랐던 id”를 요청 시 생성할지(= on-demand generation) 여부는 `dynamicParams` 설정으로 바꿀 수 있습니다.
+
+---
+
+## 4. Step 3: On-demand ISR – `revalidatePath`
+
+정확히 “어느 순간에” 갱신할지 제어하고 싶다면,
+데이터 변경이 일어나는 지점(예: 글 생성/수정 Server Action)에서 **`revalidatePath()`** 를 호출합니다.
+
+```ts
+// app/actions.ts
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost() {
+  // ... DB에 글 생성 등
+  revalidatePath('/posts') // /posts 경로 캐시 무효화
+}
+```
+
+주의:
+
+- `revalidatePath`는 **캐시 엔트리를 무효화**하지만, **재생성은 “다음 요청” 때** 일어납니다.
+- App Router에서 “즉시 재생성(eager regeneration)”은 별도 메서드가 필요하며, 문서에서 Pages Router의 `res.revalidate`를 참고로 언급합니다.
+
+---
+
+## 5. Step 4: On-demand ISR – `revalidateTag` (더 세밀하게)
+
+대부분은 “경로 단위” 재검증이 권장되지만, 더 세밀한 컨트롤이 필요하면 **tag 기반**으로 관리할 수 있습니다.
+
+### 5-1) `fetch`에 tag 달기
+
+```ts
+export default async function Page() {
+  const data = await fetch('https://api.vercel.app/blog', {
+    next: { tags: ['posts'] },
+  })
+  const posts = await data.json()
+  // ...
+}
+```
+
+### 5-2) DB/ORM이면 `unstable_cache` + tags
+
+```ts
+import { unstable_cache } from 'next/cache'
+import { db, posts } from '@/lib/db'
+
+const getCachedPosts = unstable_cache(
+  async () => {
+    return await db.select().from(posts)
+  },
+  ['posts'],
+  { revalidate: 3600, tags: ['posts'] }
+)
+
+export default async function Page() {
+  const posts = getCachedPosts()
+  // ...
+}
+```
+
+### 5-3) tag 무효화하기
+
+```ts
+'use server'
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost() {
+  // ... DB 업데이트 등
+  revalidateTag('posts')
+}
+```
+
+---
+
+## 6. 예외/오류가 발생하면?
+
+ISR 갱신 중 에러가 나면:
+
+- **마지막으로 성공한 캐시 버전**이 계속 제공됩니다.
+- 다음 요청에서 Next.js가 **재시도**합니다.
+
+---
+
+## 7. 캐시 저장 위치 커스터마이즈
+
+여러 컨테이너/인스턴스에서 캐시를 공유하거나, 캐시를 **내구성 있는 스토리지**에 저장하고 싶다면
+Next.js의 캐시 위치를 구성할 수 있습니다(문서에서 “cache location” 설정을 안내).
+
+또한 문서의 버전 히스토리에 따르면 `v14.1.0`에서 **Custom `cacheHandler`** 가 stable로 표시됩니다.
+
+---
+
+## 8. Troubleshooting (현상 확인/디버깅)
+
+### 8-1) 로컬에서 “프로덕션처럼” 테스트
+
+ISR은 dev 서버보다 **프로덕션 모드(`next build` + `next start`)** 에서 동작 확인이 더 정확합니다.
+
+### 8-2) 캐시 히트/미스 로그 보기
+
+`.env`에 아래를 추가하면 서버 콘솔에 ISR 캐시 로그가 출력됩니다.
+
+```env
+NEXT_PRIVATE_DEBUG_CACHE=1
+```
+
+또는 `next.config.js`의 fetch logging 옵션을 활용해, 어떤 fetch가 캐시되는지 디버깅할 수 있습니다.
+
+```js
+// next.config.js
+module.exports = {
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+}
+```
+
+---
+
+## 9. Caveats (주의사항)
+
+- ISR은 기본 런타임인 **Node.js runtime**에서만 지원됩니다.
+- **Static export**에서는 ISR이 지원되지 않습니다.
+- 하나의 라우트에서 여러 `fetch`가 있고 revalidate 시간이 다르면,
+    - ISR 기준으로는 가장 낮은 시간이 적용될 수 있습니다.
+- `fetch`에 `revalidate: 0` 또는 `no-store`가 섞이면 해당 라우트는 **동적 렌더링**으로 전환될 수 있습니다.
+- On-demand ISR 요청에서는 Proxy가 실행되지 않을 수 있으므로, **리라이트된 경로가 아니라 실제 경로를 정확히 revalidate** 해야 합니다.
+
+---
+
+## 10. 정리
+
+- ISR은 **정적 페이지를 유지**하면서도, 필요할 때 **런타임 갱신**을 가능하게 합니다.
+- 시간 기반(`export const revalidate = N`)과,
+  이벤트 기반(`revalidatePath`, `revalidateTag`) 두 축으로 이해하면 설계가 쉽습니다.
+- 운영 환경 검증은 `next build` + `next start` + debug cache 로그로 확인하는 것이 좋습니다.

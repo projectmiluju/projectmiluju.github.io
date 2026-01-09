@@ -1,0 +1,364 @@
+---
+title: "Next.js Error Handling 정리"
+date: 2025-01-02
+summary: "Next.js Docs – Getting Started: **Error Handling** 내용을 기반으로, App Router 환경에서의 에러 처리 방식을 정리한 문서입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 10
+---
+
+# Next.js Error Handling 정리
+
+Next.js Docs – Getting Started: **Error Handling** 내용을 기반으로, App Router 환경에서의 에러 처리 방식을 정리한 문서입니다.
+
+---
+
+## 1. 개요
+
+Next.js App Router에서는 **에러를 UI 수준에서 안전하게 처리**하기 위해 다음과 같은 메커니즘을 제공합니다.
+
+- 라우트 세그먼트 단위 에러 UI: `error.tsx`
+- 전역(Global) 에러 UI: `global-error.tsx`
+- 404 (Not Found) 처리: `not-found.tsx` + `notFound()`
+- Route Handler (`route.ts`)에서의 에러 처리
+- 에러 로깅 및 복구(Reset) 패턴
+
+이 문서는 위 기능들을 정리하고, 실무에서 자주 쓰이는 패턴을 예제를 통해 설명합니다.
+
+---
+
+## 2. 에러의 종류
+
+Next.js에서 에러는 대략 두 가지 범주로 나눌 수 있습니다.
+
+1. **예상 가능한 에러 (Expected Errors)**
+    - 예: 404 Not Found, 권한 부족(403), 폼 검증 실패, 잘못된 입력 등
+    - 보통 **사용자에게 친절한 메시지와 안내 UI**를 보여 주어야 합니다.
+
+2. **예상하지 못한 에러 (Unexpected Errors)**
+    - 예: 버그, null 참조, DB 연결 실패, 외부 API 장애 등
+    - 사용자에게 시스템 내부 정보를 노출하지 않고,  
+      **"문제가 발생했습니다" 정도의 안전한 UI + 에러 로깅**이 필요합니다.
+
+App Router의 에러 핸들링 시스템은 위 두 가지를 **서로 다른 UI와 흐름으로 분리**할 수 있게 해 줍니다.
+
+---
+
+## 3. 세그먼트 에러 UI: `error.tsx`
+
+### 3.1 기본 개념
+
+각 라우트 세그먼트(폴더) 안에 `error.tsx` 파일을 두면,  
+해당 세그먼트 아래에서 발생한 에러를 **그 파일이 에러 바운더리(error boundary)처럼 잡아** UI를 대체합니다.
+
+- 파일 위치 예시:
+
+```bash
+app/
+  dashboard/
+    layout.tsx
+    page.tsx
+    error.tsx     # dashboard 세그먼트에 대한 에러 UI
+```
+
+- `error.tsx`는 **반드시 Client Component**여야 하므로, 최상단에 `'use client'`를 선언해야 합니다.
+
+### 3.2 기본 형태 및 props
+
+```tsx
+// app/dashboard/error.tsx
+'use client'
+
+import { useEffect } from 'react'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // 에러 로깅 (Sentry, LogRocket 등)
+    console.error(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>대시보드에서 문제가 발생했습니다.</h2>
+      <button
+        onClick={
+          // 다시 시도
+          () => reset()
+        }
+      >
+        다시 시도하기
+      </button>
+    </div>
+  )
+}
+```
+
+- **`error`**
+    - 실제 발생한 Error 객체가 전달됩니다.
+    - `digest`는 Next.js가 내부적으로 부여하는 에러 식별자(해시)로, 로깅 시 함께 저장해 두면 원인 파악에 도움이 됩니다.
+- **`reset()`**
+    - 현재 세그먼트의 에러 상태를 초기화하고 **해당 세그먼트 트리를 다시 렌더링**합니다.
+    - 보통 “다시 시도하기” 버튼에 연결합니다.
+
+### 3.3 에러 전파 범위
+
+- `app/dashboard/error.tsx`는 `app/dashboard` 세그먼트와 그 하위(예: `/dashboard/settings`)에서 발생한 에러를 처리합니다.
+- 특정 자식 세그먼트가 자신만의 `error.tsx`를 가진다면, 해당 자식 세그먼트의 에러는 **자기 자신의 error.tsx가 먼저 처리**합니다.
+
+```bash
+app/
+  dashboard/
+    error.tsx       # /dashboard 전체
+    settings/
+      page.tsx
+      error.tsx     # /dashboard/settings 전용
+```
+
+- `/dashboard/settings`에서 에러가 발생하면:
+    1. `app/dashboard/settings/error.tsx`가 먼저 사용되고,
+    2. 없다면 상위인 `app/dashboard/error.tsx`로 전파됩니다.
+
+---
+
+## 4. 전역 에러 UI: `global-error.tsx`
+
+### 4.1 언제 필요한가?
+
+`error.tsx`는 **해당 세그먼트의 렌더링 이후**에 발생하는 에러를 처리합니다.  
+그러나 다음과 같은 경우에는 `error.tsx`로 처리할 수 없습니다.
+
+- `app/layout.tsx`(루트 레이아웃) 렌더링 과정에서 발생한 에러
+- `app/global-error.tsx` 자체를 제외한 **전역 수준의 에러**
+
+이런 에러를 처리하기 위해 **전역 에러 UI 컴포넌트인 `global-error.tsx`**를 사용합니다.
+
+### 4.2 파일 구조 및 요구사항
+
+```bash
+app/
+  layout.tsx
+  page.tsx
+  global-error.tsx   # 전역 에러 핸들링
+```
+
+```tsx
+// app/global-error.tsx
+'use client'
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    <html>
+      <body>
+        <h2>앱 전체에서 문제가 발생했습니다.</h2>
+        <button onClick={() => reset()}>다시 시도하기</button>
+      </body>
+    </html>
+  )
+}
+```
+
+- `global-error.tsx` 역시 **Client Component**여야 합니다.
+- 일반 `layout.tsx`와는 다르게, **직접 `<html>`, `<body>`를 렌더링**해야 합니다.
+- 루트 레이아웃에서 발생한 에러는 이 컴포넌트에 의해 처리됩니다.
+
+---
+
+## 5. 404 처리: `not-found.tsx`와 `notFound()`
+
+### 5.1 `not-found.tsx`
+
+`not-found.tsx`는 특정 세그먼트(혹은 전체 앱)에서 **404 Not Found** 상황을 처리하는 UI입니다.
+
+```bash
+app/
+  blog/
+    [slug]/
+      page.tsx
+      not-found.tsx   # /blog/[slug]에서의 404 UI
+```
+
+```tsx
+// app/blog/[slug]/not-found.tsx
+export default function NotFound() {
+  return (
+    <div>
+      <h2>해당 게시글을 찾을 수 없습니다.</h2>
+      <p>URL을 다시 확인해 주세요.</p>
+    </div>
+  )
+}
+```
+
+- 해당 세그먼트 내에서 404가 발생하면, 이 컴포넌트로 UI가 대체됩니다.
+- 전역적인 404 페이지가 필요하다면 `app/not-found.tsx`를 만들면 됩니다.
+
+### 5.2 `notFound()` 헬퍼 함수
+
+`next/navigation` 모듈에서 제공하는 `notFound()` 함수를 호출하면,  
+해당 세그먼트의 `not-found.tsx` UI가 렌더링됩니다.
+
+```tsx
+// app/blog/[slug]/page.tsx
+import { notFound } from 'next/navigation'
+import { getPostBySlug } from '@/lib/db'
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const post = await getPostBySlug(slug)
+
+  if (!post) {
+    // 404 처리
+    return notFound()
+  }
+
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <p>{post.content}</p>
+    </article>
+  )
+}
+```
+
+- `notFound()`는 **예상 가능한 “데이터 없음” 상황**에서 사용합니다.
+- 사용자 입장에서는 **정상적인 404 페이지**로 보이며, 내부적으로는 에러라기보다는 **특수한 컨트롤 플로우**에 가깝습니다.
+
+---
+
+## 6. Route Handler에서의 에러 처리
+
+`app/api/.../route.ts` 와 같은 Route Handler에서는, 일반 Node.js/Express와 비슷한 방식으로 에러를 처리합니다.
+
+### 6.1 기본 패턴: try/catch + 상태 코드
+
+```tsx
+// app/api/posts/[id]/route.ts
+import { NextResponse } from 'next/server'
+import { getPostById } from '@/lib/db'
+
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const post = await getPostById(params.id)
+
+    if (!post) {
+      return NextResponse.json(
+        { message: 'Post not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(post)
+  } catch (error) {
+    console.error(error)
+
+    return NextResponse.json(
+      { message: 'Internal Server Error' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+- **404**: 리소스를 찾지 못한 예상 가능한 상황 → 404 상태 코드와 함께 JSON 반환
+- **500**: 예기치 못한 에러 → 500 상태 코드로 응답, 내부 에러 정보는 로깅만 수행
+
+### 6.2 Response 객체를 던지는 패턴
+
+Next.js Route Handler에서는 **`Response` 객체를 throw** 하는 방식으로도 에러 흐름을 제어할 수 있습니다.
+
+```tsx
+// app/api/posts/[id]/route.ts
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  const post = await getPostById(params.id)
+
+  if (!post) {
+    throw new Response('Not Found', { status: 404 })
+  }
+
+  return NextResponse.json(post)
+}
+```
+
+- 이 패턴은 라우트 핸들러 내부에서 **여러 곳에서 에러를 던지는 구조**일 때 유용합니다.
+
+---
+
+## 7. 에러 로깅과 관측(Observability)
+
+### 7.1 `error.tsx`에서 로깅
+
+앞서 본 것처럼, `error.tsx`에서 `useEffect`를 사용해 에러를 로깅 서비스로 보낼 수 있습니다.
+
+```tsx
+// app/dashboard/error.tsx
+'use client'
+
+import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
+
+  return (
+    <div>
+      <h2>문제가 발생했습니다.</h2>
+      <button onClick={() => reset()}>다시 시도</button>
+    </div>
+  )
+}
+```
+
+### 7.2 Dev vs Prod 환경
+
+- **개발 환경**
+    - Next.js는 **에러 오버레이(에러 화면)**를 통해 스택 트레이스와 원인을 상세히 보여주며, HMR(핫 리로드)을 통해 빠르게 수정할 수 있게 돕습니다.
+- **프로덕션 환경**
+    - 사용자는 `error.tsx` / `global-error.tsx` 에 정의한 **커스텀 에러 UI**만 보게 됩니다.
+    - 자세한 에러 정보는 로깅 서비스에만 남기고, 사용자에게는 내부 정보가 노출되지 않도록 해야 합니다.
+
+---
+
+## 8. 에러 리셋(reset) 동작
+
+`error.tsx`에서 전달되는 `reset()` 함수는 다음 두 가지 경로로 에러 상태를 초기화합니다.
+
+1. 사용자가 수동으로 `reset()` 버튼을 눌렀을 때
+2. 특정 **네비게이션 이벤트**가 발생했을 때 (예: 경로/검색 파라미터 변경)
+
+기본적으로 Next.js는 **에러가 발생한 세그먼트에 머무를 때는 에러 상태를 유지**하고,  
+다른 세그먼트로 이동하거나 새로 렌더링해야 할 때 에러 상태를 재설정합니다.
+
+이 동작 방식 덕분에, 사용자가 “뒤로 가기 / 다른 페이지로 이동” 했을 때 **에러 화면이 끈질기게 남아 있지 않고 자연스럽게 사라지는 경험**을 제공합니다.
+
+---

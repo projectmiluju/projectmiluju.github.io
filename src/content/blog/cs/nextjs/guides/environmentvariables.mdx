@@ -1,0 +1,263 @@
+---
+title: "Next.js Environment Variables 가이드 정리"
+date: 2025-01-22
+summary: "Next.js는 환경 변수(Environment Variables)를 기본적으로 지원합니다. 이를 통해 다음과 같은 작업을 할 수 있습니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 12
+---
+
+# Next.js Environment Variables 가이드 정리
+
+## 1. 개요
+
+Next.js는 환경 변수(Environment Variables)를 기본적으로 지원합니다. 이를 통해 다음과 같은 작업을 할 수 있습니다.
+
+- `.env` 파일에서 환경 변수 로드
+- `NEXT_PUBLIC_` 접두사를 사용해 **브라우저 번들에 포함되는 환경 변수**를 선언
+
+> 기본 `create-next-app` 템플릿은 `.env*` 파일이 `.gitignore`에 자동으로 추가되어 있습니다.  
+> 환경 변수 파일에는 민감한 값이 포함되므로 일반적으로 **레포지토리에 커밋하면 안 됩니다.**
+
+---
+
+## 2. .env 파일에서 환경 변수 로딩
+
+Next.js는 `.env*` 파일에서 값을 읽어 `process.env`로 자동 로드합니다.
+
+예시 (.env):
+
+```bash
+DB_HOST=localhost
+DB_USER=myuser
+DB_PASS=mypassword
+```
+
+위 설정은 Node.js 환경에서 다음과 같이 사용할 수 있습니다.
+
+```ts
+// app/api/route.js
+export async function GET() {
+  const db = await myDB.connect({
+    host: process.env.DB_HOST,
+    username: process.env.DB_USER,
+    password: process.env.DB_PASS,
+  })
+  // ...
+}
+```
+
+### 2.1 멀티라인 환경 변수
+
+`.env` 파일에서 여러 줄에 걸친 값을 지정할 수 있습니다.
+
+```bash
+# .env
+
+# 줄바꿈을 그대로 사용하는 방식
+PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+...
+Kh9NV...
+...
+-----END DSA PRIVATE KEY-----"
+
+# \n을 사용한 방식
+PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nKh9NV...\n-----END DSA PRIVATE KEY-----\n"
+```
+
+### 2.2 /src 폴더 사용 시 주의사항
+
+- `src` 디렉터리를 사용하는 경우에도, `.env*` 파일은 **프로젝트 루트**에 두어야 합니다.
+- Next.js는 `src` 폴더 안이 아니라 **루트 기준**으로 `.env*` 파일을 로드합니다.
+
+---
+
+## 3. @next/env로 런타임 외부에서 환경 변수 로딩
+
+Next.js 런타임 외부(예: ORM 설정 파일, 테스트 러너, 별도 스크립트 등)에서도 같은 방식으로 환경 변수를 사용하고 싶다면 `@next/env` 패키지를 사용할 수 있습니다.
+
+1. 패키지 설치:
+
+```bash
+npm install @next/env
+```
+
+2. 환경 변수 로드를 위한 유틸 파일 작성 (`envConfig.ts` 예시):
+
+```ts
+// envConfig.ts
+import { loadEnvConfig } from '@next/env'
+
+const projectDir = process.cwd()
+loadEnvConfig(projectDir)
+```
+
+3. 실제 설정 파일에서 import:
+
+```ts
+// orm.config.ts
+import './envConfig.ts'
+
+export default defineConfig({
+  dbCredentials: {
+    connectionString: process.env.DATABASE_URL!,
+  },
+})
+```
+
+이렇게 하면 Next.js 내부와 동일한 규칙으로 `.env*`를 로드할 수 있습니다.
+
+---
+
+## 4. 다른 환경 변수를 참조하기
+
+`.env` 파일에서는 `$VARIABLE` 형태로 다른 환경 변수를 참조할 수 있습니다.
+
+```bash
+# .env
+TWITTER_USER=nextjs
+TWITTER_URL=https://x.com/$TWITTER_USER
+```
+
+위 설정에서 `process.env.TWITTER_URL` 값은 `https://x.com/nextjs`가 됩니다.
+
+> 참고: 값 안에 `$` 기호를 문자 그대로 사용하려면 `\$`처럼 이스케이프해야 합니다.
+
+---
+
+## 5. 브라우저 번들에 환경 변수 포함하기 (NEXT_PUBLIC_)
+
+기본적으로 Next.js 환경 변수는 Node.js 환경에서만 사용 가능하며, 브라우저에서는 접근할 수 없습니다.
+
+브라우저에서 사용해야 하는 값은 **빌드 타임에 JavaScript 번들에 인라인**되어야 합니다. 이를 위해 `NEXT_PUBLIC_` 접두사를 사용합니다.
+
+예시:
+
+```bash
+NEXT_PUBLIC_ANALYTICS_ID=abcdefghijk
+```
+
+위와 같이 선언하면 Next.js는 `next build` 시점에 코드 안의 `process.env.NEXT_PUBLIC_ANALYTICS_ID` 참조를 실제 값으로 치환합니다.
+
+```ts
+// pages/index.js
+import setupAnalyticsService from '../lib/my-analytics-service'
+
+// 빌드 시점에 setupAnalyticsService('abcdefghijk')로 치환됩니다.
+setupAnalyticsService(process.env.NEXT_PUBLIC_ANALYTICS_ID)
+
+function HomePage() {
+  return <h1>Hello World</h1>
+}
+
+export default HomePage
+```
+
+### 5.1 인라인되지 않는 경우 (동적 참조)
+
+다음과 같은 패턴은 **인라인되지 않습니다**.
+
+```ts
+// 변수명을 문자열로 조합하는 경우
+const varName = 'NEXT_PUBLIC_ANALYTICS_ID'
+setupAnalyticsService(process.env[varName])
+
+// process.env를 별도 변수에 담은 경우
+const env = process.env
+setupAnalyticsService(env.NEXT_PUBLIC_ANALYTICS_ID)
+```
+
+### 5.2 빌드 후 값이 고정된다는 점
+
+- `NEXT_PUBLIC_` 변수를 사용하면 **빌드 타임에 값이 확정**됩니다.
+- 하나의 Docker 이미지를 여러 환경에 배포하거나, Heroku 파이프라인 등으로 빌드 결과물을 승격할 경우:
+    - 빌드 시점 환경 변수 값이 그대로 유지되므로, 빌드 단계에서 올바른 값을 설정해야 합니다.
+- 런타임에 변경 가능한 값이 필요하다면:
+    - 별도의 API를 만들어 브라우저에서 호출하는 방식으로 설계해야 합니다.
+
+---
+
+## 6. Runtime 환경 변수 (서버에서)
+
+Next.js는 **빌드 타임**뿐 아니라 **런타임** 환경 변수도 지원합니다.
+
+- 기본적으로 환경 변수는 서버에서만 사용 가능하며, 브라우저로 노출되지 않습니다.
+- App Router에서 **동적 렌더링**을 사용하는 경우, 서버 컴포넌트나 Route Handler 내부에서 `process.env` 값을 런타임 시점에 읽을 수 있습니다.
+
+예시:
+
+```ts
+// app/page.ts
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // cookies, headers 등 동적 API 사용 시
+  // 이 환경 변수는 런타임에 평가됩니다.
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+이 패턴을 사용하면:
+
+- 동일한 Docker 이미지를 여러 환경(dev/stage/prod)에 배포하더라도
+- 각 환경의 런타임 환경 변수 값을 서버에서 동적으로 읽어 사용할 수 있습니다.
+
+---
+
+## 7. Test 환경 변수 (.env.test)
+
+Next.js는 `development`와 `production` 외에 `test` 환경도 지원합니다.
+
+- `NODE_ENV=test`일 때는 `.env.test` 파일이 사용됩니다.
+- 이 경우:
+    - `.env.development` / `.env.production` 값은 로드되지 않습니다.
+    - `.env.local`도 로드되지 않습니다. (테스트는 모든 사람에게 동일한 결과가 나와야 하기 때문입니다.)
+
+테스트 도구(Jest, Cypress 등)를 사용할 때는 `@next/env`의 `loadEnvConfig`를 활용해 Next.js와 동일한 방식으로 환경 변수를 로드할 수 있습니다.
+
+```ts
+// Jest 글로벌 설정 예시
+import { loadEnvConfig } from '@next/env'
+
+export default async () => {
+  const projectDir = process.cwd()
+  loadEnvConfig(projectDir)
+}
+```
+
+---
+
+## 8. 환경 변수 로드 우선순위
+
+Next.js는 다음 순서로 환경 변수를 조회하며, 먼저 찾은 값을 사용합니다.
+
+1. `process.env` (이미 설정된 값)
+2. `.env.$(NODE_ENV).local`
+3. `.env.local` (`NODE_ENV=test`인 경우에는 제외)
+4. `.env.$(NODE_ENV)`
+5. `.env`
+
+예를 들어, `NODE_ENV=development`이고 `.env.development.local`과 `.env` 모두에 동일한 변수가 정의되어 있다면:
+
+- `.env.development.local` 값이 우선합니다.
+
+> 허용되는 `NODE_ENV` 값: `production`, `development`, `test`
+
+---
+
+## 9. 기타 팁 및 버전 히스토리
+
+- `/src` 디렉터리를 사용하는 경우에도 `.env*` 파일은 **프로젝트 루트**에 두어야 합니다.
+- `NODE_ENV`가 설정되어 있지 않다면:
+    - `next dev` 실행 시 자동으로 `development`
+    - 그 외 명령에서는 자동으로 `production`으로 인식합니다.
+- 버전 히스토리:
+    - `v9.4.0`에서 `.env` 및 `NEXT_PUBLIC_` 지원이 도입되었습니다.
+
+환경 변수는 보안과 운영 관점에서 매우 중요한 요소이므로:
+
+- 민감한 값(API 키, DB 비밀번호 등)은 항상 `.env*` 또는 배포 플랫폼의 **환경 변수 설정**을 통해 관리하고
+- 코드 레포지토리에는 커밋하지 않는 것이 좋습니다.

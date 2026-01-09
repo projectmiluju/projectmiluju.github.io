@@ -1,0 +1,227 @@
+---
+title: "Next.js Internationalization 가이드 정리 (App Router)"
+date: 2025-01-26
+summary: "Next.js는 **여러 언어/지역(locale)** 을 지원하기 위해, 라우팅과 렌더링을 구성할 수 있게 해줍니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 16
+---
+
+# Next.js Internationalization 가이드 정리 (App Router)
+
+## 1. Internationalization 개요
+
+Next.js는 **여러 언어/지역(locale)** 을 지원하기 위해, 라우팅과 렌더링을 구성할 수 있게 해줍니다.
+
+- **국제화 라우트(Internationalized Routes)**: locale에 따라 URL 구조가 달라지는 라우팅 설계
+- **로컬라이제이션(Localization)**: 같은 라우트라도 locale에 따라 번역된 텍스트/콘텐츠를 보여주는 작업
+
+---
+
+## 2. Terminology (용어)
+
+- **Locale**: 언어 + (선택적으로) 지역/포맷 선호도를 나타내는 식별자
+    - `en-US`: 미국식 영어
+    - `nl-NL`: 네덜란드식 네덜란드어
+    - `nl`: 지역 없는 네덜란드어
+
+---
+
+## 3. Routing Overview (라우팅 설계)
+
+브라우저의 언어 선호도는 요청 헤더인 `Accept-Language`로 전달됩니다.  
+권장 패턴은 **요청의 `Accept-Language` + 앱이 지원하는 locale 목록 + 기본 locale** 을 조합해 최적의 locale을 선택하는 것입니다.
+
+문서 예시에서는 아래 라이브러리 조합을 소개합니다.
+
+- `negotiator`: 요청 헤더에서 선호 언어 목록 추출
+- `@formatjs/intl-localematcher`: 선호 언어 목록을 “지원 locale” 중 가장 적합한 값으로 매칭
+
+```js
+import { match } from '@formatjs/intl-localematcher'
+import Negotiator from 'negotiator'
+
+let headers = { 'accept-language': 'en-US,en;q=0.5' }
+let languages = new Negotiator({ headers }).languages()
+
+let locales = ['en-US', 'nl-NL', 'nl']
+let defaultLocale = 'en-US'
+
+match(languages, locales, defaultLocale) // -> 'en-US'
+```
+
+### 3-1) URL 전략: sub-path 또는 domain
+
+국제화 라우팅은 보통 두 방식 중 하나로 구성합니다.
+
+- **sub-path**: `/fr/products` 처럼 경로 앞에 locale을 붙이는 방식
+- **domain**: `my-site.fr/products` 처럼 도메인으로 locale을 구분하는 방식
+
+---
+
+## 4. Step 1: locale이 없는 요청을 locale 경로로 Redirect 하기 (Proxy 예시)
+
+문서 예시는 “locale이 URL에 포함되어 있지 않으면” locale prefix를 붙여 redirect 하는 흐름을 보여줍니다.
+
+```js
+import { NextResponse } from 'next/server'
+
+let locales = ['en-US', 'nl-NL', 'nl']
+
+// Get the preferred locale, similar to the above or using a library
+function getLocale(request) { /* ... */ }
+
+export function proxy(request) {
+  const { pathname } = request.nextUrl
+
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  )
+
+  if (pathnameHasLocale) return
+
+  const locale = getLocale(request)
+  request.nextUrl.pathname = `/${locale}${pathname}`
+  return NextResponse.redirect(request.nextUrl)
+}
+
+export const config = {
+  matcher: [
+    // Skip all internal paths (_next)
+    '/((?!_next).*)',
+  ],
+}
+```
+
+---
+
+## 5. Step 2: `app/[lang]` 구조로 라우팅을 locale 파라미터에 연결하기
+
+locale을 동적 세그먼트로 받기 위해, 라우트/레이아웃/특수 파일들을 `app/[lang]/...` 아래로 둡니다.
+
+예:
+
+```ts
+// app/[lang]/page.tsx
+export default async function Page({ params }: PageProps<'/[lang]'>) {
+  const { lang } = await params
+  return ...
+}
+```
+
+- `lang` 값은 `/en-US/products` 같은 URL에서 `"en-US"`가 됩니다.
+- 문서에서는 `PageProps`, `LayoutProps`가 **전역 TypeScript 헬퍼**로 제공된다고 안내합니다.
+
+---
+
+## 6. Localization (번역/사전 로딩 패턴)
+
+로컬라이제이션은 Next.js에만 국한된 개념은 아니지만, App Router에서는 Server Component 기본값 덕분에 **번역 파일이 클라이언트 번들에 실리지 않게** 구성하기 쉽습니다.
+
+### 6-1) locale별 dictionary 준비
+
+```json
+// dictionaries/en.json
+{
+  "products": {
+    "cart": "Add to Cart"
+  }
+}
+```
+
+```json
+// dictionaries/nl.json
+{
+  "products": {
+    "cart": "Toevoegen aan Winkelwagen"
+  }
+}
+```
+
+### 6-2) `getDictionary()` 구현 (서버에서만 로드)
+
+```ts
+// app/[lang]/dictionaries.ts
+import 'server-only'
+
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((m) => m.default),
+  nl: () => import('./dictionaries/nl.json').then((m) => m.default),
+}
+
+export type Locale = keyof typeof dictionaries
+
+export const hasLocale = (locale: string): locale is Locale =>
+  locale in dictionaries
+
+export const getDictionary = async (locale: Locale) => dictionaries[locale]()
+```
+
+### 6-3) 페이지에서 locale 검증 + dictionary 사용
+
+```ts
+// app/[lang]/page.tsx
+import { notFound } from 'next/navigation'
+import { getDictionary, hasLocale } from './dictionaries'
+
+export default async function Page({ params }: PageProps<'/[lang]'>) {
+  const { lang } = await params
+
+  if (!hasLocale(lang)) notFound()
+
+  const dict = await getDictionary(lang)
+  return <button>{dict.products.cart}</button>
+}
+```
+
+- `lang`는 문자열이므로, `hasLocale()`로 타입을 좁히고
+- 지원하지 않는 locale이면 `notFound()`로 404 처리합니다.
+
+---
+
+## 7. Static Rendering (정적 생성)
+
+특정 locale 목록에 대해 정적 라우트를 생성하고 싶다면, 페이지/레이아웃에 `generateStaticParams()`를 사용할 수 있습니다.
+
+예: `app/[lang]/layout.tsx`에서 전역적으로 locale 정적 생성
+
+```ts
+export async function generateStaticParams() {
+  return [{ lang: 'en-US' }, { lang: 'de' }]
+}
+
+export default async function RootLayout({
+  children,
+  params,
+}: LayoutProps<'/[lang]'>) {
+  return (
+    <html lang={(await params).lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+---
+
+## 8. Resources (문서에서 소개한 라이브러리/예제)
+
+- Minimal i18n routing and translations (GitHub)
+- next-intl
+- next-international
+- next-i18n-router
+- paraglide-next
+- lingui
+- tolgee
+- next-intlayer
+- gt-next
+
+---
+
+## 9. 정리
+
+- locale은 보통 `Accept-Language` 기반으로 결정하고, URL에 반영해 라우팅합니다.
+- `app/[lang]` 구조로 locale 파라미터를 라우팅 전역에 전달할 수 있습니다.
+- dictionary를 `server-only` + dynamic import로 로드하면 번역 파일이 클라이언트 번들에 부담을 주지 않습니다.
+- `generateStaticParams()`로 locale별 정적 라우트도 생성할 수 있습니다.

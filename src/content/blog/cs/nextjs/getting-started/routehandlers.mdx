@@ -1,0 +1,352 @@
+---
+title: "Next.js Route Handlers 정리"
+date: 2025-01-07
+summary: "Next.js Docs – Getting Started: **Route Handlers** 페이지를 기반으로, App Router 환경에서의 Route Handler 개념과 사용 방법을 정리한 문서입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 15
+---
+
+# Next.js Route Handlers 정리
+
+Next.js Docs – Getting Started: **Route Handlers** 페이지를 기반으로, App Router 환경에서의 Route Handler 개념과 사용 방법을 정리한 문서입니다.
+
+---
+
+## 1. Route Handlers 개요
+
+**Route Handlers**는 특정 라우트에 대해 **맞춤형 HTTP 요청 처리 로직**을 작성할 수 있게 해 주는 기능이다.  
+웹 표준 **Request / Response API**를 직접 사용하며, Next.js는 여기에 `NextRequest`, `NextResponse`를 확장하여 제공한다.
+
+- 위치: **`app` 디렉터리 안에서만** 사용할 수 있다.
+- 역할: `pages` 디렉터리의 **API Routes(`/pages/api/*`)와 동등한 역할**을 한다.
+- 주의: 보통 **API Routes와 Route Handlers를 동시에 사용할 필요는 없다.**
+
+예를 들어, `/api` 경로에 간단한 GET 핸들러를 만들 수 있다.
+
+```ts
+// app/api/route.ts
+export async function GET(request: Request) {
+  return new Response('Hello from Route Handler')
+}
+```
+
+---
+
+## 2. 컨벤션(Convention)과 파일 구조
+
+Route Handler는 **`route.js` 또는 `route.ts`** 파일 이름을 가지며, `app` 디렉터리 아래 어디에나 둘 수 있다.
+
+```text
+app/
+  api/
+    route.ts          // -> /api
+  products/
+    route.ts          // -> /products
+  blog/
+    [slug]/
+      route.ts        // -> /blog/:slug
+```
+
+기본 형태는 다음과 같다.
+
+```ts
+// app/api/route.ts
+export async function GET(request: Request) {
+  // 요청 처리
+}
+```
+
+### 2.1 page.js와의 공존 규칙
+
+- Route Handlers는 `page.js` / `page.tsx`, `layout.tsx`처럼 **중첩 구조**를 가질 수 있다.
+- 그러나 **같은 라우트 세그먼트 레벨에 `page.js`와 `route.js`가 동시에 존재할 수 없다.**
+
+예시:
+
+| 파일 구조                             | 결과        |
+| ------------------------------------- | ----------- |
+| `app/page.js` + `app/route.js`       | ❌ 충돌     |
+| `app/page.js` + `app/api/route.js`   | ✅ 유효     |
+| `app/[user]/page.js` + `app/api/route.js` | ✅ 유효 |
+
+각 `route.js` 또는 `page.js` 파일은 **해당 경로에 대한 모든 HTTP 메서드 처리**를 담당한다.
+
+```tsx
+// app/page.ts
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+
+// ❌ 같은 경로에 app/route.ts가 있으면 충돌
+// app/route.ts
+export async function POST(request: Request) {}
+```
+
+---
+
+## 3. 지원 HTTP 메서드
+
+Route Handler에서 지원하는 HTTP 메서드는 다음과 같다.
+
+- `GET`
+- `POST`
+- `PUT`
+- `PATCH`
+- `DELETE`
+- `HEAD`
+- `OPTIONS`
+
+이 중 **정의된 함수만 동작**하며, 정의되지 않은 메서드가 호출되면 Next.js가 자동으로 **`405 Method Not Allowed`** 응답을 반환한다.
+
+예시:
+
+```ts
+// app/api/users/route.ts
+export async function GET() {
+  return Response.json({ message: 'GET /api/users' })
+}
+
+export async function POST(request: Request) {
+  const body = await request.json()
+  return Response.json({ message: 'POST /api/users', body })
+}
+```
+
+---
+
+## 4. Request / Response 및 NextRequest / NextResponse
+
+Route Handlers는 기본적으로 **웹 표준 객체**인 `Request`, `Response`를 사용한다.
+
+```ts
+// 표준 Web Request / Response 사용
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const name = searchParams.get('name') ?? 'World'
+
+  return new Response(`Hello, ${name}`)
+}
+```
+
+또한 Next.js는 고급 기능을 위해 `next/server` 모듈에서 **`NextRequest`, `NextResponse`**를 제공한다.
+
+```ts
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const name = searchParams.get('name') ?? 'World'
+
+  return NextResponse.json({ message: `Hello, ${name}` })
+}
+```
+
+### 4.1 런타임 API (cookies, headers 등)
+
+Route Handlers에서는 Server Components와 동일하게 다음과 같은 런타임 API들을 사용할 수 있다.
+
+- `cookies()` – 요청/응답 쿠키 읽기 및 설정
+- `headers()` – 요청 헤더 읽기
+- `redirect()`, `permanentRedirect()` – 리다이렉트 처리 등
+
+```ts
+import { cookies, headers } from 'next/headers'
+import { NextResponse } from 'next/server'
+
+export async function GET() {
+  const headerList = await headers()
+  const userAgent = headerList.get('user-agent')
+
+  const cookieStore = cookies()
+  const token = cookieStore.get('token')?.value
+
+  return NextResponse.json({ userAgent, token })
+}
+```
+
+> 참고: 런타임 API(`cookies()`, `headers()`, `connection()` 등)를 사용하면 **프리렌더링이 중단되고 요청 시점 렌더링**이 사용된다. (5장 참조)
+
+---
+
+## 5. 캐싱(Caching)과 Cache Components
+
+### 5.1 기본 캐싱 동작
+
+- Route Handlers는 **기본적으로 캐시되지 않는다.**
+- 단, `GET` 핸들러에 한해서만 **명시적으로 캐시를 활성화**할 수 있다.
+- 다른 HTTP 메서드(`POST`, `PUT` 등)는 캐시되지 않는다.
+
+`GET`을 캐시하려면 Route Handler 파일에 **Route Segment Config**를 사용한다.
+
+```ts
+// app/items/route.ts
+export const dynamic = 'force-static'
+
+export async function GET() {
+  const res = await fetch('https://data.mongodb-api.com/...', {
+    headers: {
+      'Content-Type': 'application/json',
+      'API-Key': process.env.DATA_API_KEY!,
+    },
+  })
+  const data = await res.json()
+
+  return Response.json({ data })
+}
+```
+
+- 여기서 `dynamic = 'force-static'`은 해당 Route Handler를 **정적(static)으로 강제**하여 응답을 캐시하도록 한다.
+- 같은 파일 안에 다른 메서드(`POST`, `PUT` 등)가 있어도 **그 메서드들은 캐시되지 않는다.**
+
+### 5.2 Cache Components가 활성화된 경우
+
+`next.config.js`에서 **Cache Components** 기능을 사용하면, `GET` Route Handler는 일반 UI 라우트와 동일한 모델을 따른다.
+
+- 기본 동작: **요청 시점(request time)에 실행**
+- 다음과 같은 경우 **프리렌더링(정적 생성)** 가능
+    - 네트워크 요청, DB 쿼리, 파일 시스템 접근, 비결정적 연산을 사용하지 않을 때
+- `use cache`를 사용해 동적 데이터를 **정적 응답 안에 포함**시킬 수도 있다.
+
+#### 5.2.1 정적 예시 (빌드 타임 프리렌더링 가능)
+
+```ts
+// app/api/project-info/route.ts
+export async function GET() {
+  return Response.json({
+    projectName: 'Next.js',
+  })
+}
+```
+
+- 동적 데이터나 런타임 API를 사용하지 않으므로 **빌드 시점에 프리렌더링**된다.
+
+#### 5.2.2 동적 예시 (비결정적 연산 사용)
+
+```ts
+// app/api/random-number/route.ts
+export async function GET() {
+  return Response.json({
+    randomNumber: Math.random(),
+  })
+}
+```
+
+- `Math.random()`은 비결정적 연산이므로, 빌드 중에는 **프리렌더링이 중단**되고
+    - 실제 요청 시점에만 실행된다.
+
+#### 5.2.3 런타임 데이터 예시 (요청별 데이터 사용)
+
+```ts
+// app/api/user-agent/route.ts
+import { headers } from 'next/headers'
+
+export async function GET() {
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent')
+
+  return Response.json({ userAgent })
+}
+```
+
+- `headers()`는 요청마다 달라지는 **런타임 데이터**를 읽기 때문에,
+    - 이 역시 빌드 타임 프리렌더링이 아니라 **요청 시점 렌더링**으로 처리된다.
+
+> 프리렌더링은 다음과 같은 요소를 사용할 때 중단된다.
+>
+> - 네트워크 요청, 데이터베이스 쿼리, 비동기 파일 시스템 접근
+> - `request.url`, `request.headers`, `request.cookies`, `request.body` 등의 요청 데이터
+> - `cookies()`, `headers()`, `connection()` 등의 런타임 API
+> - `Math.random()`, `Date.now()` 같은 비결정적 연산
+
+### 5.3 `use cache` + `cacheLife`를 이용한 캐싱
+
+동적 데이터를 사용하지만 **프리렌더링 가능한 형태로 캐시**하고 싶을 때는  
+헬퍼 함수 안에서 `'use cache'`와 `cacheLife()`를 사용한다.
+
+```ts
+// app/api/products/route.ts
+import { cacheLife } from 'next/cache'
+
+export async function GET() {
+  const products = await getProducts()
+  return Response.json(products)
+}
+
+async function getProducts() {
+  'use cache'
+  cacheLife('hours') // 또는 'minutes', 'days' 등
+
+  // 예: 데이터베이스 쿼리
+  return await db.query('SELECT * FROM products')
+}
+```
+
+- `'use cache'`는 **Route Handler 본문이 아니라 별도 함수 내부에서 사용해야 한다.**
+- `cacheLife('hours')`는 해당 캐시가 **얼마 동안 유효한지(재검증 주기)**를 정의한다.
+- 이후 새로운 요청이 들어오면, 필요에 따라 백그라운드에서 재검증이 이루어진다.
+
+---
+
+## 6. Special Route Handlers
+
+다음과 같은 파일들은 **특수한 Route Handler**로 취급된다.
+
+- `sitemap.ts`
+- `opengraph-image.tsx`
+- `icon.tsx`
+- 기타 메타데이터 파일(`robots.txt`, `manifest.json` 등)
+
+특징:
+
+- 기본적으로 **정적(static)** 이다.
+- 다만, 이 안에서 동적 API를 사용하거나 동적 구성 옵션을 사용하면
+    - 그에 맞게 동작 방식이 바뀔 수 있다.
+
+> 메타데이터 및 OG 이미지와 관련된 자세한 내용은 별도의 “Metadata and OG images” 문서를 참고하면 된다.
+
+---
+
+## 7. Route Resolution (라우트 해석 규칙)
+
+Route Handler의 `route.js`는 **가장 낮은 레벨의 라우팅 원시(primitive)** 로 간주된다.
+
+- `page.js`와 달리
+    - **레이아웃 구조나 클라이언트 사이드 내비게이션에 참여하지 않는다.**
+    - 순수하게 **HTTP 요청에 대한 응답만 처리**한다.
+- 동일 세그먼트에 `page.js`와 `route.js`를 함께 둘 수 없다. (2.1절 참고)
+
+정리하면:
+
+- `page.tsx` : UI 렌더링, 레이아웃 및 클라이언트 내비게이션에 참여
+- `route.ts` : HTTP 요청 처리(데이터 API, 웹훅, 프록시 등)에 특화
+
+각각의 파일이 **한 라우트에 대한 모든 HTTP 메서드를 책임지는 구조**이므로,  
+UI와 API를 같은 경로에서 혼합하려면 **UI 경로와 API 경로를 구분**하는 것이 좋다. (예: `/app/page.tsx` vs `/app/api/route.ts`)
+
+---
+
+## 8. Route Context Helper (TypeScript용)
+
+TypeScript에서는 Route Handler의 두 번째 인자인 `context`에  
+전역 타입인 **`RouteContext`**를 적용할 수 있다.
+
+```ts
+// app/users/[id]/route.ts
+import type { NextRequest } from 'next/server'
+
+export async function GET(
+  _req: NextRequest,
+  ctx: RouteContext<'/users/[id]'>,
+) {
+  const { id } = await ctx.params
+  return Response.json({ id })
+}
+```
+
+- `RouteContext<'/users/[id]'>`는 해당 라우트 패턴에 맞춰 `params` 타입을 자동으로 생성한다.
+- 이 타입은 `next dev`, `next build`, `next typegen` 실행 시 자동으로 생성된다.
+- 덕분에 **동적 세그먼트(`[id]`, `[slug]`, `[...rest]` 등)** 에 대한 타입 안전성을 확보할 수 있다.
+
+---

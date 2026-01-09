@@ -1,0 +1,129 @@
+---
+title: "Next.js App Router Guide: Lazy Loading"
+date: 2025-01-28
+summary: "Lazy loading은 **초기 로딩 성능**을 위해 특정 라우트에서 필요한 JavaScript 양을 줄이고, **Client Component / 라이브러리를 “필요할 때” 로드**하도록 돕습니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 18
+---
+
+# Next.js App Router Guide: Lazy Loading
+
+## 무엇을 해결하나?
+Lazy loading은 **초기 로딩 성능**을 위해 특정 라우트에서 필요한 JavaScript 양을 줄이고, **Client Component / 라이브러리를 “필요할 때” 로드**하도록 돕습니다.
+
+> 기본적으로 Server Components는 자동으로 code splitting 되며, Lazy loading은 주로 **Client Components**에 적용됩니다.
+
+## 구현 방법 2가지
+1. `next/dynamic` (권장)
+2. `React.lazy()` + `Suspense`
+
+## 1) `next/dynamic`로 Client Component 지연 로드
+```jsx
+// app/page.js
+'use client'
+
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
+
+const ComponentA = dynamic(() => import('../components/A'))
+const ComponentB = dynamic(() => import('../components/B'))
+const ComponentC = dynamic(() => import('../components/C'), { ssr: false })
+
+export default function ClientComponentExample() {
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <div>
+      {/* 즉시 로드(하지만 별도 client 번들) */}
+      <ComponentA />
+
+      {/* 조건이 만족될 때만 로드 */}
+      {showMore && <ComponentB />}
+      <button onClick={() => setShowMore(!showMore)}>Toggle</button>
+
+      {/* 클라이언트에서만 로드 */}
+      <ComponentC />
+    </div>
+  )
+}
+```
+
+### `ssr: false` 주의
+- `ssr: false`는 **Client Component에서만** 동작합니다.
+- Server Component에서 `next/dynamic` + `ssr: false`를 쓰면 에러가 납니다. (Client Component로 옮겨야 함)
+
+## 2) Server Component를 dynamic import 하는 경우
+Server Component 자체가 지연 로드되는 것이 아니라, **그 하위의 Client Components**가 주로 지연 로드됩니다.  
+또한 Server Component에서 사용할 때 CSS 같은 정적 자산 preload에 도움이 될 수 있습니다.
+
+```jsx
+// app/page.js (Server Component 예시)
+import dynamic from 'next/dynamic'
+
+const ServerComponent = dynamic(() => import('../components/ServerComponent'))
+
+export default function ServerComponentExample() {
+  return (
+    <div>
+      <ServerComponent />
+    </div>
+  )
+}
+```
+
+## 3) 외부 라이브러리(예: fuse.js) 온디맨드 로드
+`import()`를 이벤트 핸들러 등에서 호출해, 입력이 발생한 뒤에만 라이브러리를 불러올 수 있습니다.
+
+```jsx
+'use client'
+
+import { useState } from 'react'
+
+const names = ['Tim', 'Joe', 'Bel', 'Lee']
+
+export default function Page() {
+  const [results, setResults] = useState()
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Search"
+        onChange={async (e) => {
+          const { value } = e.currentTarget
+          const Fuse = (await import('fuse.js')).default
+          const fuse = new Fuse(names)
+          setResults(fuse.search(value))
+        }}
+      />
+      <pre>Results: {JSON.stringify(results, null, 2)}</pre>
+    </div>
+  )
+}
+```
+
+## 4) 커스텀 로딩 UI 추가
+```jsx
+'use client'
+
+import dynamic from 'next/dynamic'
+
+const WithCustomLoading = dynamic(() => import('../components/WithCustomLoading'), {
+  loading: () => <p>Loading...</p>,
+})
+
+export default function Page() {
+  return <WithCustomLoading />
+}
+```
+
+## 5) Named export 동적 import
+```jsx
+import dynamic from 'next/dynamic'
+
+const ClientComponent = dynamic(() =>
+  import('../components/hello').then((mod) => mod.Hello)
+)
+```

@@ -67,6 +67,20 @@ export const siteConfig = {
       folder: 'books/self-taught-ca-os',
       icon: '📚'
     },
+    { 
+      slug: 'Next.js Getting Started', 
+      name: 'Next.js 시작하기', 
+      category: 'cs',
+      folder: 'cs/nextjs/getting-started',
+      icon: '▲'
+    },
+    { 
+      slug: 'Next.js Guides', 
+      name: 'Next.js 가이드', 
+      category: 'cs',
+      folder: 'cs/nextjs/guides',
+      icon: '📖'
+    },
   ],
 };
 

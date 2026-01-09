@@ -1,0 +1,345 @@
+---
+title: "Next.js 설치 (Installation)"
+date: 2025-01-01
+summary: "Next.js 공식 문서의 **Installation** 페이지 내용을 번역·요약하여 마크다운 형식으로 정리한 자료입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Getting Started"
+order: 1
+---
+
+# Next.js 설치 (Installation)
+
+Next.js 공식 문서의 **Installation** 페이지 내용을 번역·요약하여 마크다운 형식으로 정리한 자료입니다.
+
+---
+
+## 1. Quick start (가장 빠른 시작)
+
+새로운 Next.js 애플리케이션을 가장 빠르게 생성하는 방법은 다음과 같습니다.
+
+1. `my-app`이라는 새 Next.js 프로젝트 생성
+2. 프로젝트 디렉터리로 이동
+3. 개발 서버 실행 후 `http://localhost:3000` 접속
+
+```bash
+pnpm create next-app@latest my-app --yes
+cd my-app
+pnpm dev
+```
+
+- `--yes` 옵션
+    - 설치 과정에서 나오는 질문을 건너뛰고 기본값 또는 이전 설정을 그대로 사용합니다.
+    - 기본값에는 **TypeScript, Tailwind CSS, ESLint, App Router, Turbopack, import alias `@/*`** 등이 포함됩니다.
+
+---
+
+## 2. System requirements (시스템 요구사항)
+
+Next.js 개발을 시작하기 전에 다음 환경이 필요합니다.
+
+- **Node.js 버전**: `20.9` 이상
+- **지원 운영 체제**
+    - macOS
+    - Windows (WSL 포함)
+    - Linux
+
+> 터미널에서 `node -v` 명령으로 버전을 확인한 뒤, 부족하다면 Node.js를 업데이트해야 합니다.
+
+---
+
+## 3. Supported browsers (지원 브라우저)
+
+Next.js는 기본 설정만으로 최신 주요 브라우저를 지원합니다.
+
+- Chrome 111 이상
+- Edge 111 이상
+- Firefox 111 이상
+- Safari 16.4 이상
+
+보다 세부적인 브라우저 타겟 및 폴리필 설정은 별도의 **Browser support** 문서에서 다룹니다.
+
+---
+
+## 4. Create with the CLI (CLI로 프로젝트 생성)
+
+가장 권장되는 방법은 **`create-next-app` CLI**를 사용하는 것입니다.
+
+```bash
+npx create-next-app@latest
+```
+
+실행하면 대략 다음과 같은 질문들이 순서대로 표시됩니다.
+
+```text
+What is your project named? my-app
+
+Would you like to use the recommended Next.js defaults?
+  Yes, use recommended defaults - TypeScript, ESLint, Tailwind CSS, App Router, Turbopack
+  No, reuse previous settings
+  No, customize settings - Choose your own preferences
+```
+
+`No, customize settings`를 선택하면 아래 항목들을 직접 설정할 수 있습니다.
+
+- TypeScript 사용 여부
+- 린터 선택: `ESLint / Biome / None`
+- React Compiler 사용 여부
+- Tailwind CSS 사용 여부
+- `src/` 디렉터리 사용 여부
+- App Router 사용 여부 (권장)
+- import alias (`@/*`) 사용 여부 및 문자열 설정
+
+질문에 답변을 완료하면 `create-next-app`이 **프로젝트 폴더를 생성하고 필요한 의존성을 자동으로 설치**합니다.
+
+---
+
+## 5. Manual installation (수동 설치)
+
+CLI를 사용하지 않고 직접 Next.js 프로젝트를 구성할 수도 있습니다.
+
+### 5-1. 패키지 설치
+
+프로젝트 루트에서 다음 명령으로 패키지를 설치합니다.
+
+```bash
+pnpm i next@latest react@latest react-dom@latest
+```
+
+> 참고: App Router는 React 19 변경 사항과 일부 실험 기능이 포함된 **React canary 릴리즈**를 내부적으로 사용합니다.  
+> Pages Router는 `package.json`에 지정된 React 버전을 그대로 사용합니다.
+
+### 5-2. `package.json` 스크립트 추가
+
+`package.json`에 기본 스크립트를 다음과 같이 추가합니다.
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
+  }
+}
+```
+
+각 스크립트의 의미는 다음과 같습니다.
+
+- `next dev`  
+  → Turbopack(기본 번들러)을 사용하여 개발 서버를 실행합니다.
+- `next build`  
+  → 프로덕션용 빌드를 생성합니다.
+- `next start`  
+  → 빌드된 애플리케이션을 프로덕션 모드로 실행합니다.
+- `eslint` / `eslint --fix`  
+  → ESLint를 실행하고, 자동 수정 옵션을 사용할 수 있습니다.
+
+> Turbopack 대신 Webpack을 사용하고 싶다면  
+> `next dev --webpack`, `next build --webpack`과 같이 명령을 실행하면 됩니다.
+
+---
+
+## 6. Create the app directory (`app` 디렉터리 생성)
+
+Next.js는 **파일 시스템 기반 라우팅**을 사용하므로, 폴더 구조가 곧 라우트 구조가 됩니다.
+
+### 6-1. `app/layout.tsx` 생성 (Root Layout)
+
+1. 프로젝트 루트에 `app` 폴더를 생성합니다.
+2. `app` 폴더 안에 `layout.tsx` 파일을 생성합니다. 이 파일이 **루트 레이아웃(root layout)** 역할을 합니다.
+
+- 이 파일은 **반드시** `<html>`과 `<body>` 태그를 포함해야 합니다.
+
+```tsx
+// app/layout.tsx
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### 6-2. `app/page.tsx` 생성 (홈 페이지)
+
+```tsx
+// app/page.tsx
+export default function Page() {
+  return <h1>Hello, Next.js!</h1>
+}
+```
+
+- 사용자가 `/` (루트 경로)에 접속하면 `layout.tsx`와 `page.tsx`가 함께 렌더링됩니다.
+
+> 참고 사항
+> - 루트 레이아웃이 없을 경우, `next dev` 실행 시 Next.js가 자동으로 생성하기도 합니다.
+> - 프로젝트 루트에 `src` 폴더를 두고 그 안에 `app` 및 다른 코드를 배치하는 구조도 사용할 수 있습니다.
+
+---
+
+## 7. Create the public folder (선택 사항)
+
+정적 리소스(이미지, 폰트 등)를 저장하기 위한 **`public` 폴더**를 루트에 생성할 수 있습니다.
+
+- `public` 폴더 안의 파일은 URL 기준 `/` 루트에서 바로 접근할 수 있습니다.
+    - 예: `public/profile.png` → 브라우저 및 코드에서 `/profile.png`로 참조
+
+```tsx
+// app/page.tsx
+import Image from 'next/image'
+
+export default function Page() {
+  return (
+    <Image
+      src="/profile.png"
+      alt="Profile"
+      width={100}
+      height={100}
+    />
+  )
+}
+```
+
+---
+
+## 8. Run the development server (개발 서버 실행)
+
+프로젝트 구성이 완료되었다면, 다음 명령으로 개발 서버를 실행할 수 있습니다.
+
+```bash
+npm run dev
+```
+
+이후 브라우저에서 `http://localhost:3000` 주소로 접속합니다.
+
+- `app/page.tsx` 파일을 수정한 뒤 저장하면, 브라우저에서 변경 사항이 자동으로 반영됩니다(Fast Refresh).
+
+---
+
+## 9. Set up TypeScript (TypeScript 설정)
+
+Next.js는 **TypeScript를 기본적으로 지원**합니다.
+
+- 최소 TypeScript 버전: `v5.1.0`
+
+TypeScript를 사용하는 방법은 다음과 같습니다.
+
+1. 프로젝트 내 파일 확장자를 `.ts` 또는 `.tsx`로 변경합니다.
+2. `next dev` 명령을 실행합니다.
+3. Next.js가 자동으로:
+    - 필요한 TypeScript 관련 패키지를 설치하고
+    - `tsconfig.json` 파일을 생성하며
+    - 추천 설정 값을 추가합니다.
+
+---
+
+## 10. IDE Plugin (IDE 플러그인)
+
+Next.js는 자체 **TypeScript 플러그인과 타입 체커**를 제공하여 IDE에서 더 나은 타입 검사와 자동 완성을 사용할 수 있습니다.
+
+VS Code에서 워크스페이스 TypeScript 버전을 사용하는 방법은 다음과 같습니다.
+
+1. 명령 팔레트를 엽니다: `Ctrl/⌘ + Shift + P`
+2. `"TypeScript: Select TypeScript Version"`을 선택합니다.
+3. `"Use Workspace Version"`을 선택합니다.
+
+이렇게 설정하면, 프로젝트에 설치된 TypeScript(Next.js 플러그인 포함)를 사용하게 됩니다.
+
+---
+
+## 11. Set up linting (린팅 설정)
+
+Next.js는 **ESLint** 또는 **Biome**를 린터로 사용할 수 있도록 지원합니다.
+
+### 11-1. ESLint 사용 예시
+
+```json
+{
+  "scripts": {
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
+  }
+}
+```
+
+### 11-2. Biome 사용 예시
+
+```json
+{
+  "scripts": {
+    "lint": "biome check",
+    "format": "biome format --write"
+  }
+}
+```
+
+### 11-3. `next lint`에서 마이그레이션
+
+기존에 `next lint`를 사용하고 있었다면, 다음 codemod를 사용하여 **ESLint CLI 기반** 설정으로 옮길 수 있습니다.
+
+```bash
+npx @next/codemod@canary next-lint-to-eslint-cli .
+```
+
+또한 ESLint를 사용하는 경우, 명시적인 설정 파일(권장: `eslint.config.mjs`)을 두는 것이 좋습니다.  
+기존 `.eslintrc.*` 형식과 새로운 `eslint.config.mjs` 형식 모두 지원합니다.
+
+> 참고: Next.js 16부터는 `next build` 명령이 자동으로 린터를 실행하지 않습니다.  
+> 따라서 린트는 `npm run lint`와 같이 별도의 NPM 스크립트로 실행해야 합니다.
+
+---
+
+## 12. Absolute Imports & Module Path Aliases (절대 경로 import 및 경로 별칭)
+
+Next.js는 `tsconfig.json` 또는 `jsconfig.json`의 `"baseUrl"`과 `"paths"` 옵션을 그대로 지원하여, **절대 경로 import** 및 **경로 alias**를 사용할 수 있습니다.
+
+상대 경로가 복잡한 경우 예시는 다음과 같습니다.
+
+```ts
+// Before
+import { Button } from '../../../components/button'
+
+// After
+import { Button } from '@/components/button'
+```
+
+### 12-1. `baseUrl` 설정
+
+`tsconfig.json` 또는 `jsconfig.json`에 `baseUrl`만 지정해도 절대 경로 import를 사용할 수 있습니다.
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": "src/"
+  }
+}
+```
+
+- 위 설정은 `src/`를 기준으로 절대 경로를 해석합니다.
+
+### 12-2. `paths`로 alias 상세 설정
+
+`paths` 옵션을 사용하면 특정 접두어를 원하는 폴더에 매핑할 수 있습니다.
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": "src/",
+    "paths": {
+      "@/styles/*": ["styles/*"],
+      "@/components/*": ["components/*"]
+    }
+  }
+}
+```
+
+- `"paths"` 값은 모두 `baseUrl`을 기준으로 한 상대 경로입니다.
+
+---

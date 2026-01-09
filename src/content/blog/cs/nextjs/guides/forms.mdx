@@ -1,0 +1,290 @@
+---
+title: "Next.js Forms 가이드 정리 (App Router)"
+date: 2025-01-23
+summary: "**Forms(폼)** 가이드는 Next.js(App Router)에서 **React Server Actions(= Server Functions)** 로 폼 제출을 처리하는 방법을 설명합니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 13
+---
+
+# Next.js Forms 가이드 정리 (App Router)
+
+## 1. Forms 개요
+
+**Forms(폼)** 가이드는 Next.js(App Router)에서 **React Server Actions(= Server Functions)** 로 폼 제출을 처리하는 방법을 설명합니다.
+
+- `<form action={serverAction}>` 형태로 **서버에서 실행되는 함수**를 바로 호출할 수 있습니다.
+- 폼에서 호출된 Server Action은 자동으로 **`FormData`** 를 받아서 값 추출이 가능합니다.
+- 폼 제출 후 DB 업데이트 같은 **데이터 변경(mutation)** 과 함께, 필요하다면 **캐시 재검증(revalidate)** 도 연결할 수 있습니다.
+
+구성은 크게 아래 흐름으로 이해하면 됩니다.
+
+1. Server Action을 만들고 `<form action={...}>`로 연결하기
+2. 추가 인자 전달이 필요하면 `bind()` 또는 hidden input으로 처리하기
+3. 검증/에러/로딩/낙관적 업데이트 등 UX를 단계적으로 붙이기
+
+---
+
+## 2. Step 1: Server Action 연결하기
+
+가장 기본적인 형태는 **Server Component 안에서** Server Action을 정의하고 `use server` 지시어를 붙이는 방식입니다.
+
+```ts
+// app/invoices/page.tsx (예시)
+export default function Page() {
+  async function createInvoice(formData: FormData) {
+    'use server'
+
+    const rawFormData = {
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    }
+
+    // 1) mutate data (DB 업데이트 등)
+    // 2) revalidate cache (필요 시)
+  }
+
+  return <form action={createInvoice}>{/* ... */}</form>
+}
+```
+
+참고 팁:
+
+- 필드가 많으면 `Object.fromEntries(formData)`를 사용할 수 있습니다.
+- 다만 이 객체에는 `$ACTION_`로 시작하는 **추가 속성**이 포함될 수 있다는 점을 주의합니다.
+
+---
+
+## 3. Step 2: 추가 인자 전달하기 (Passing additional arguments)
+
+폼 필드 외에 `userId` 같은 값을 Server Action에 같이 넘기고 싶다면, **`bind()`** 로 인자를 미리 고정할 수 있습니다.
+
+```ts
+// app/client-component.tsx
+'use client'
+
+import { updateUser } from './actions'
+
+export function UserProfile({ userId }: { userId: string }) {
+  const updateUserWithId = updateUser.bind(null, userId)
+
+  return (
+    <form action={updateUserWithId}>
+      <input type="text" name="name" />
+      <button type="submit">Update User Name</button>
+    </form>
+  )
+}
+```
+
+서버 액션 시그니처는 다음처럼 **추가 인자 + FormData** 형태로 받습니다.
+
+```ts
+// app/actions.ts
+'use server'
+
+export async function updateUser(userId: string, formData: FormData) {
+  // ...
+}
+```
+
+대안:
+
+- hidden input으로 전달도 가능하지만, 그 값은 HTML에 노출됩니다.
+
+---
+
+## 4. Step 3: Form validation (클라이언트/서버 검증)
+
+폼 검증은 크게 2가지가 같이 사용됩니다.
+
+- 클라이언트: `required`, `type="email"` 같은 **HTML 기본 검증**
+- 서버: Zod 같은 라이브러리로 **서버에서 최종 검증**
+
+```ts
+// app/actions.ts
+'use server'
+
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string({ invalid_type_error: 'Invalid Email' }),
+})
+
+export default async function createUser(formData: FormData) {
+  const validatedFields = schema.safeParse({
+    email: formData.get('email'),
+  })
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+    }
+  }
+
+  // Mutate data
+}
+```
+
+---
+
+## 5. Step 4: Validation errors 표시하기
+
+서버 검증 결과를 화면에 보여주려면, `<form>`을 가진 컴포넌트를 **Client Component로 전환**하고 React의 **`useActionState`** 를 사용합니다.
+
+핵심 포인트:
+
+- `useActionState`를 쓰면 Server Action 시그니처가 `(prevState, formData)` 형태로 바뀝니다.
+- Client에서 `state`를 보고 에러/메시지를 렌더링합니다.
+
+```ts
+// app/ui/signup.tsx (예시)
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+const initialState = { message: '' }
+
+export function Signup() {
+  const [state, formAction] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      <input name="email" type="email" required />
+      {state?.message ? <p>{state.message}</p> : null}
+      <button type="submit">Sign up</button>
+    </form>
+  )
+}
+```
+
+---
+
+## 6. Step 5: Pending states (로딩/비활성 처리)
+
+### 6-1) `useActionState`로 pending 처리
+
+`useActionState`는 `pending` boolean을 함께 제공하므로, 제출 버튼 비활성화 같은 처리가 쉽습니다.
+
+```ts
+'use client'
+
+import { useActionState } from 'react'
+import { createUser } from '@/app/actions'
+
+export function Signup() {
+  const [state, formAction, pending] = useActionState(createUser, initialState)
+
+  return (
+    <form action={formAction}>
+      {/* ... */}
+      <button disabled={pending}>Sign up</button>
+    </form>
+  )
+}
+```
+
+### 6-2) `useFormStatus`로 pending 처리 (컴포넌트 분리)
+
+`useFormStatus`를 쓰면, 버튼을 별도 컴포넌트로 분리해서 폼 내부에서 pending 상태만 읽을 수 있습니다.
+
+```ts
+// app/ui/button.tsx
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <button disabled={pending} type="submit">
+      Sign Up
+    </button>
+  )
+}
+```
+
+> 참고: React 19에서는 `useFormStatus()`가 `pending` 외에 `data`, `method`, `action` 같은 추가 키를 포함할 수 있습니다(버전 차이 주의).
+
+---
+
+## 7. Step 6: Optimistic updates (낙관적 UI)
+
+서버 응답을 기다리기 전에 UI를 먼저 업데이트하고 싶다면 React의 **`useOptimistic`** 를 사용합니다.
+
+```ts
+'use client'
+
+import { useOptimistic } from 'react'
+import { send } from './actions'
+
+type Message = { message: string }
+
+export function Thread({ messages }: { messages: Message[] }) {
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic<Message[], string>(
+    messages,
+    (state, newMessage) => [...state, { message: newMessage }]
+  )
+
+  const formAction = async (formData: FormData) => {
+    const message = formData.get('message') as string
+    addOptimisticMessage(message)
+    await send(message)
+  }
+
+  return (
+    <div>
+      {optimisticMessages.map((m, i) => (
+        <div key={i}>{m.message}</div>
+      ))}
+      <form action={formAction}>
+        <input type="text" name="message" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+---
+
+## 8. Step 7: Nested form elements (폼 내부에서 여러 액션)
+
+`<form>` 내부에 있는 `<button>`, `<input type="submit">` 같은 요소에서 **`formAction`** 을 활용하면,
+하나의 폼 안에서 **여러 Server Action** 을 호출하는 패턴도 가능합니다.
+
+예: “임시저장” 버튼은 draft 저장 액션, “발행” 버튼은 publish 액션 등.
+
+---
+
+## 9. Step 8: Programmatic form submission (프로그래밍 방식 제출)
+
+키보드 단축키(예: `⌘ + Enter`) 등으로 폼 제출을 트리거하고 싶다면, `requestSubmit()`을 사용할 수 있습니다.
+
+```ts
+'use client'
+
+export function Entry() {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 'NumpadEnter')) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return <textarea name="entry" rows={20} required onKeyDown={handleKeyDown} />
+}
+```
+
+---
+
+## 10. 정리 및 활용 팁
+
+- **Server Action + `<form action>`** 조합이 핵심이며, 제출 데이터는 `FormData`로 받습니다.
+- UX는 `useActionState`(에러+pending), `useFormStatus`(폼 상태), `useOptimistic`(낙관적 UI)로 단계적으로 강화합니다.
+- 데이터 변경 후 목록/상세가 즉시 갱신되어야 한다면, Server Action 안에서 캐시 재검증(revalidate)을 함께 설계하는 흐름이 자연스럽습니다.
+
+---

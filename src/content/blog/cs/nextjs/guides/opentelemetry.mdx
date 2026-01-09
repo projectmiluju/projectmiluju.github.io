@@ -1,0 +1,201 @@
+---
+title: "Next.js OpenTelemetry 가이드 정리"
+date: 2025-02-08
+summary: "**OpenTelemetry(OTel)**은 로그/메트릭/트레이스(분산 추적)를 위한 **벤더 중립(플랫폼 불문) 표준**입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 29
+---
+
+# Next.js OpenTelemetry 가이드 정리
+
+## 1. OpenTelemetry 개요
+
+**OpenTelemetry(OTel)**은 로그/메트릭/트레이스(분산 추적)를 위한 **벤더 중립(플랫폼 불문) 표준**입니다.
+
+- 특정 관측(Observability) 벤더에 종속되지 않고 계측을 구현할 수 있어,
+  나중에 벤더를 바꾸더라도 코드를 크게 바꾸지 않는 장점이 있습니다.
+- Next.js는 기본적으로 OpenTelemetry 계측을 지원하며(Next.js 자체가 이미 계측됨),
+  이를 활성화하면 Next.js 내부 처리/라우트 렌더링/`fetch` 등에서 유용한 span을 얻을 수 있습니다.
+
+---
+
+## 2. Step 1: 빠른 시작 (`@vercel/otel` 사용)
+
+공식 문서는 초기 구성을 쉽게 하기 위해 `@vercel/otel` 사용을 권장합니다.
+
+### 2.1 패키지 설치
+
+```bash
+npm install @vercel/otel @opentelemetry/sdk-logs @opentelemetry/api-logs @opentelemetry/instrumentation
+```
+
+### 2.2 `instrumentation.ts` 파일 생성
+
+- 프로젝트 루트에 `instrumentation.ts`(또는 `.js`) 생성
+- `src` 폴더 구조를 쓰면 `src/instrumentation.ts`에 둡니다.
+- **`app/` 또는 `pages/` 안에 두면 안 됩니다.**
+
+```ts
+// instrumentation.ts
+import { registerOTel } from '@vercel/otel'
+
+export function register() {
+  registerOTel({ serviceName: 'next-app' })
+}
+```
+
+> Good to know:
+> - `pageExtensions`로 파일 접미사를 바꾸는 설정을 쓴다면, `instrumentation` 파일명도 그 규칙에 맞춰야 합니다.
+
+---
+
+## 3. Step 2: 수동(Manual) OpenTelemetry 설정 (고급)
+
+`@vercel/otel`이 제공하는 옵션으로 부족한 경우, OpenTelemetry를 직접 구성할 수 있습니다.
+
+### 3.1 패키지 설치
+
+```bash
+npm install @opentelemetry/sdk-node @opentelemetry/resources @opentelemetry/semantic-conventions   @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http
+```
+
+### 3.2 Edge 런타임 주의 (NodeSDK는 Edge 미지원)
+
+`NodeSDK`는 **Edge runtime과 호환되지 않으므로**, `NEXT_RUNTIME === 'nodejs'`일 때만 로드해야 합니다.
+
+```ts
+// instrumentation.ts
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./instrumentation.node')
+  }
+}
+```
+
+```ts
+// instrumentation.node.ts
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
+import { resourceFromAttributes } from '@opentelemetry/resources'
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node'
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+
+const sdk = new NodeSDK({
+  resource: resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: 'next-app',
+  }),
+  spanProcessor: new SimpleSpanProcessor(new OTLPTraceExporter()),
+})
+
+sdk.start()
+```
+
+> Edge 지원이 필요하면 `@vercel/otel`을 사용해야 한다고 문서에서 안내합니다.
+
+---
+
+## 4. Step 3: 로컬에서 계측 테스트
+
+로컬에서 트레이스를 보려면 **OTel Collector + 호환 백엔드**가 필요합니다.  
+문서는 로컬 테스트용 “OpenTelemetry dev environment” 예제를 추천합니다.
+
+성공하면 다음을 확인할 수 있습니다.
+
+- 루트 서버 span이 `GET /requested/pathname` 같은 형태로 보임
+- 해당 trace 아래에 다른 span들이 계층 구조로 중첩됨
+
+더 많은 span을 보고 싶다면:
+
+```bash
+NEXT_OTEL_VERBOSE=1
+```
+
+---
+
+## 5. 배포(Deployment) 옵션
+
+### 5.1 Collector 사용
+
+Collector를 사용하는 배포 환경에서는 `@vercel/otel`을 그대로 사용할 수 있으며, Vercel/자체 호스팅 모두 지원됩니다.
+
+- Vercel: “Observability provider 연결”을 Vercel 문서 흐름대로 설정
+- Self-hosting: 직접 Collector를 띄우고, Next.js 앱이 Collector로 telemetry를 보내도록 구성
+
+### 5.2 Custom Exporter 사용
+
+Collector 없이도, `@vercel/otel` 또는 manual 설정 위에 **커스텀 Exporter**를 붙일 수 있습니다.
+
+---
+
+## 6. Custom Spans 추가하기
+
+Next.js가 기본 span을 생성해주더라도, 서비스 관점에서 의미 있는 span을 직접 추가할 수 있습니다.
+
+### 6.1 패키지 설치
+
+```bash
+npm install @opentelemetry/api
+```
+
+### 6.2 커스텀 span 예시
+
+```ts
+import { trace } from '@opentelemetry/api'
+
+export async function fetchGithubStars() {
+  return await trace
+    .getTracer('nextjs-example')
+    .startActiveSpan('fetchGithubStars', async (span) => {
+      try {
+        return await getValue()
+      } finally {
+        span.end()
+      }
+    })
+}
+```
+
+- `register()`는 환경이 새로 시작될 때 코드 실행 이전에 호출되므로,
+  여기서 span/설정을 초기화하면 export되는 trace에 잘 포함됩니다.
+
+---
+
+## 7. Next.js의 Default Spans 요약
+
+Next.js는 여러 “기본 span”을 자동 생성합니다.  
+span attributes는 OpenTelemetry semantic conventions를 따르며, Next.js는 `next.*` 네임스페이스의 커스텀 속성도 제공합니다.
+
+### 7.1 Next.js 커스텀 attributes(대표)
+
+- `next.span_name`: span 이름(중복 정보)
+- `next.span_type`: span 타입 식별자
+- `next.route`: 라우트 패턴 (예: `/[param]/user`)
+- `next.rsc`: RSC 요청 여부 (prefetch 등)
+- `next.page`: App Router 내부 식별 값(파일 단위에 가까움)
+- `next.segment`: 레이아웃/페이지 모듈 로딩 관련 식별
+
+### 7.2 기본 span 종류(대표)
+
+- `[http.method] [next.route]` (root request span)
+- `render route (app) [next.route]`
+- `fetch [http.method] [http.url]`
+- `executing api route (app) [next.route]`
+- `getServerSideProps [next.route]`
+- `getStaticProps [next.route]`
+- `render route (pages) [next.route]`
+- `generateMetadata [next.page]`
+- `resolve page components`
+- `resolve segment modules`
+- `start response` (첫 바이트 전송 시점, zero-length span)
+
+### 7.3 fetch span 끄기
+
+기본 fetch 계측 대신 커스텀 fetch 계측을 쓰고 싶다면 다음 환경 변수를 사용할 수 있습니다.
+
+```bash
+NEXT_OTEL_FETCH_DISABLED=1
+```
+
+---

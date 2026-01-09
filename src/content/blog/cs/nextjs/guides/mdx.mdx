@@ -1,0 +1,164 @@
+---
+title: "Next.js App Router Guide: MDX (Markdown + JSX)"
+date: 2025-02-01
+summary: "- Markdown: 텍스트를 쉽게 HTML로 구조화하는 경량 마크업"
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 21
+---
+
+# Next.js App Router Guide: MDX (Markdown + JSX)
+
+## MDX 개요
+- Markdown: 텍스트를 쉽게 HTML로 구조화하는 경량 마크업
+- MDX: Markdown + JSX (마크다운 안에 React 컴포넌트를 직접 넣을 수 있음)
+
+Next.js는:
+- 프로젝트 내부의 로컬 `.mdx`/`.md` 파일
+- 서버에서 가져오는 **Remote MDX**
+  를 지원합니다.
+
+> 주의: MDX는 컴파일되어 서버에서 실행되는 JavaScript가 될 수 있으므로, Remote MDX는 **신뢰할 수 있는 출처**에서만 가져오도록 가이드가 경고합니다(RCE 위험).
+
+## 1) 설치
+```bash
+npm install @next/mdx @mdx-js/loader @mdx-js/react @types/mdx
+```
+
+## 2) `next.config.mjs` 설정
+`.md`, `.mdx`를 page/route/import 대상으로 포함하도록 `pageExtensions`와 `createMDX`를 설정합니다.
+
+```js
+// next.config.mjs
+import createMDX from '@next/mdx'
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
+}
+
+const withMDX = createMDX({
+  // remark/rehype 플러그인 등을 여기에 추가 가능
+})
+
+export default withMDX(nextConfig)
+```
+
+### `.md`도 처리하고 싶다면
+기본은 `.mdx`만 컴파일합니다. `.md`까지 포함하려면:
+
+```js
+const withMDX = createMDX({
+  extension: /\.(md|mdx)$/,
+})
+```
+
+## 3) `mdx-components.tsx` 추가 (App Router에 필수)
+프로젝트 루트(또는 `src` 루트)에 `mdx-components.tsx`를 만들고 전역 MDX 컴포넌트를 정의합니다.
+
+```ts
+// mdx-components.tsx
+import type { MDXComponents } from 'mdx/types'
+
+const components: MDXComponents = {}
+
+export function useMDXComponents(): MDXComponents {
+  return components
+}
+```
+
+> 가이드: App Router에서 `@next/mdx`를 쓰려면 `mdx-components.tsx`가 **필수**이며, 없으면 동작하지 않습니다.
+
+## 4) 렌더링 방식
+### A. 파일 기반 라우팅 (MDX 페이지)
+`/app/mdx-page/page.mdx` 같은 식으로 바로 페이지로 만들 수 있습니다.
+
+```
+my-project
+├── app
+│   └── mdx-page
+│       └── page.mdx
+├── mdx-components.tsx
+└── package.json
+```
+
+MDX 파일 안에서 React 컴포넌트도 직접 사용 가능:
+
+```mdx
+import { MyComponent } from 'my-component'
+
+# Welcome to my MDX page!
+
+<MyComponent />
+```
+
+### B. 일반 페이지에서 MDX import
+MDX 파일을 다른 폴더에 두고, `page.tsx`에서 import 해서 렌더링할 수 있습니다.
+
+```tsx
+// app/mdx-page/page.tsx
+import Welcome from '@/markdown/welcome.mdx'
+
+export default function Page() {
+  return <Welcome />
+}
+```
+
+### C. 동적 import (블로그 같은 slug 라우팅)
+`slug`에 따라 다른 `.mdx` 파일을 동적으로 불러오는 패턴도 안내합니다.
+
+```tsx
+// app/blog/[slug]/page.tsx
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const { default: Post } = await import(`@/content/${slug}.mdx`)
+  return <Post />
+}
+
+export function generateStaticParams() {
+  return [{ slug: 'welcome' }, { slug: 'about' }]
+}
+
+export const dynamicParams = false
+```
+
+## 5) 커스텀 컴포넌트/스타일 적용
+### 전역 커스텀 (mdx-components.tsx)
+예: `h1`, `img` 등을 커스터마이징
+
+```tsx
+import Image, { type ImageProps } from 'next/image'
+import type { MDXComponents } from 'mdx/types'
+
+const components = {
+  h1: ({ children }) => <h1 style={{ color: 'red', fontSize: '48px' }}>{children}</h1>,
+  img: (props) => (
+    <Image sizes="100vw" style={{ width: '100%', height: 'auto' }} {...(props as ImageProps)} />
+  ),
+} satisfies MDXComponents
+
+export function useMDXComponents(): MDXComponents {
+  return components
+}
+```
+
+### 페이지 단위 로컬 오버라이드
+MDX 컴포넌트에 `components` prop으로 오버라이드할 수 있습니다.
+
+```tsx
+import Welcome from '@/markdown/welcome.mdx'
+
+function CustomH1({ children }) {
+  return <h1 style={{ color: 'blue', fontSize: '100px' }}>{children}</h1>
+}
+
+export default function Page() {
+  return <Welcome components={{ h1: CustomH1 }} />
+}
+```
+
+## 6) Remote MDX
+CMS/DB 등에서 MDX를 서버에서 가져와 렌더링할 수 있으며, 예시로 커뮤니티 패키지(`next-mdx-remote-client`)가 언급됩니다.
+
+> 보안 주의: Remote MDX는 반드시 신뢰할 수 있는 출처에서만 가져오세요(RCE 위험).

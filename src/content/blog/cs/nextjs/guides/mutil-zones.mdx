@@ -1,0 +1,181 @@
+---
+title: "Next.js Multi-zones 가이드 정리"
+date: 2025-02-07
+summary: "**Multi-zones**는 하나의 도메인(`example.com`) 아래에서, 서로 다른 **여러 애플리케이션(Zone)** 이 각자 특정 경로를 담당하도록 분리하는 **마이크로 프론트엔드** 접근 방식입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 28
+---
+
+# Next.js Multi-zones 가이드 정리
+
+## 1. Multi-zones 개요
+
+**Multi-zones**는 하나의 도메인(`example.com`) 아래에서, 서로 다른 **여러 애플리케이션(Zone)** 이 각자 특정 경로를 담당하도록 분리하는 **마이크로 프론트엔드** 접근 방식입니다.
+
+- 큰 애플리케이션을 경로 단위로 나누어 **각 Zone을 독립적으로 개발/배포**할 수 있습니다.
+- 각 Zone의 코드/의존성 범위가 줄어들어 **빌드 시간이 줄고**, 특정 구역에만 필요한 코드가 전체 번들에 섞이지 않게 됩니다.
+- Zone들이 분리되어 있으므로, 어떤 Zone은 Next.js가 아닌 다른 프레임워크를 써도 가능합니다.
+
+예시로 다음처럼 경로를 분리할 수 있습니다.
+
+- `/blog/*` : 블로그
+- `/dashboard/*` : 로그인 후 대시보드
+- `/*` : 그 외 웹사이트
+
+### Soft navigation vs Hard navigation
+
+- **같은 Zone 내부 이동**은 보통 **soft navigation**(리로드 없이 클라이언트 전환)으로 동작합니다.
+- **다른 Zone으로 이동**하면 **hard navigation**(페이지 리로드 + 리소스 재로딩)으로 동작합니다.
+    - 그래서 **함께 자주 오가는 페이지들은 같은 Zone**에 두는 것이 좋습니다.
+
+---
+
+## 2. Step 1: Zone 정의하기 (`assetPrefix` 설정)
+
+각 Zone은 “일반적인 Next.js 앱”입니다.  
+다만 여러 Zone이 같은 도메인에서 공존하므로, **정적 자산(`/_next/*`) 충돌 방지**를 위해 Zone별로 `assetPrefix`를 설정합니다.
+
+```js
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+}
+
+module.exports = nextConfig
+```
+
+- 이렇게 하면 Zone의 JS/CSS 같은 Next 자산은 다음처럼 제공됩니다.
+    - `/<assetPrefix>/_next/...`
+- **기본(루트) 앱**처럼 “나머지 모든 경로”를 담당하는 Zone은 `assetPrefix`가 꼭 필요하지 않습니다.
+
+> 참고: Next.js 15 이전 버전에서는 `assetPrefix` 자산을 위한 추가 rewrite가 필요할 수 있었지만, Next.js 15에서는 더 이상 필수가 아닙니다.
+
+(구버전 호환 예시)
+
+```js
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  assetPrefix: '/blog-static',
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/blog-static/_next/:path+',
+          destination: '/_next/:path+',
+        },
+      ],
+    }
+  },
+}
+
+module.exports = nextConfig
+```
+
+---
+
+## 3. Step 2: 요청을 올바른 Zone으로 라우팅하기 (rewrites)
+
+Multi-zones에서는 “요청 경로가 어떤 Zone으로 가야 하는지”를 라우팅해야 합니다.
+
+- 어떤 HTTP 프록시를 사용해도 되지만,
+- **한 Next.js 앱이 도메인 전체를 대표**하면서 `rewrites()`로 다른 Zone으로 보내는 방식이 흔합니다.
+
+예시: 루트 Zone에서 `/blog/*` 요청을 Blog Zone의 도메인으로 rewrite
+
+```js
+// next.config.js (루트 Zone)
+async rewrites() {
+  return [
+    {
+      source: '/blog',
+      destination: `${process.env.BLOG_DOMAIN}/blog`,
+    },
+    {
+      source: '/blog/:path+',
+      destination: `${process.env.BLOG_DOMAIN}/blog/:path+`,
+    },
+    // blog zone의 assetPrefix까지 함께 라우팅
+    {
+      source: '/blog-static/:path+',
+      destination: `${process.env.BLOG_DOMAIN}/blog-static/:path+`,
+    },
+  ]
+}
+```
+
+- `destination`은 **scheme+domain을 포함한 URL**이어야 합니다.
+    - 운영 도메인으로 보내는 것이 일반적이지만,
+    - 로컬 개발에서는 `http://localhost:xxxx`로도 보낼 수 있습니다.
+- **각 Zone이 담당하는 URL path는 서로 겹치면 안 됩니다.**
+    - 예: 두 Zone이 동시에 `/blog`를 담당하면 라우팅 충돌
+
+---
+
+## 4. Step 3: 프록시로 라우팅하기 (동적 결정이 필요할 때)
+
+`rewrites()`가 보통 더 빠르고 단순하지만, **동적으로 라우팅 결정을 해야 하는 경우** 프록시 방식을 사용할 수 있습니다.
+
+예: 마이그레이션 중 기능 플래그로 특정 경로를 다른 Zone으로 보낼지 결정
+
+```js
+// proxy.js (개념 예시)
+export async function proxy(req) {
+  const { pathname, search } = req.nextUrl
+
+  if (pathname === '/your-path' && myFeatureFlag.isEnabled()) {
+    return NextResponse.rewrite(`${rewriteDomain}${pathname}${search}`)
+  }
+}
+```
+
+---
+
+## 5. Step 4: Zone 간 링크 처리 (`<a>` 사용)
+
+**다른 Zone으로 가는 링크는 `<Link>` 대신 `<a>`를 사용**해야 합니다.
+
+- Next.js의 `<Link>`는 같은 앱(같은 Zone) 내의 상대 경로에 대해 prefetch/soft navigation을 시도합니다.
+- Zone을 넘나드는 경우에는 이 동작이 기대대로 동작하지 않기 때문에, **명시적으로 hard navigation**이 일어나도록 `<a>`를 씁니다.
+
+```tsx
+// 다른 Zone으로 이동하는 링크
+export function CrossZoneLink() {
+  return <a href="/dashboard">Go to dashboard</a>
+}
+```
+
+---
+
+## 6. Step 5: 코드 공유 전략
+
+Zone들은 서로 다른 레포지토리에 있어도 되지만, 보통 **모노레포**가 관리/공유에 유리합니다.
+
+- 모노레포로 `ui`, `design-system`, `utils` 같은 패키지를 공용화
+- 레포가 분리돼 있다면 private/public NPM 패키지로 공유
+- Zone별 릴리즈 타이밍이 다를 수 있으므로, **feature flag**로 “동시에 켜고 끄는” 전략이 유용할 수 있습니다.
+
+---
+
+## 7. Step 6: Server Actions 사용 시 `allowedOrigins` 설정
+
+Multi-zones 환경에서 **Server Actions**를 쓰면, 사용자에게 보이는 도메인이 여러 앱을 서빙할 수 있으므로  
+**명시적으로 허용할 origin을 설정해야 합니다.**
+
+```js
+// next.config.js
+const nextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['your-production-domain.com'],
+    },
+  },
+}
+
+module.exports = nextConfig
+```
+
+---

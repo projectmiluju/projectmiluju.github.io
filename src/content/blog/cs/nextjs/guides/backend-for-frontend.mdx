@@ -1,0 +1,386 @@
+---
+title: "Next.js 가이드 정리: Backend for Frontend (BFF)"
+date: 2025-02-09
+summary: "Backend for Frontend(BFF) 패턴은 **프론트엔드 바로 뒤에 붙어 있는 얇은 백엔드 레이어**를 두어, 다음과 같은 역할을 수행하는 방식입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 3
+---
+
+# Next.js 가이드 정리: Backend for Frontend (BFF)
+
+## 1. 개요
+
+Backend for Frontend(BFF) 패턴은 **프론트엔드 바로 뒤에 붙어 있는 얇은 백엔드 레이어**를 두어, 다음과 같은 역할을 수행하는 방식입니다.
+
+- 여러 백엔드(마이크로서비스, 기존 모놀리식 서버, 써드파티 API 등)를 하나의 API로 통합
+- 보안상 브라우저에서 직접 호출하기 어려운 백엔드 호출을 대신 수행
+- 프론트엔드에 맞춘 응답 형태(DTO, View Model)로 변환
+- 공통 로직(인증, 로깅, 검증, rate limiting 등)을 중앙에서 처리
+
+Next.js에서는 **Route Handlers**와 **Proxy**, **NextRequest/NextResponse** 등을 활용하여 BFF를 구현할 수 있습니다.
+
+---
+
+## 2. BFF를 구성하는 주요 도구
+
+### 2.1 Route Handlers (`app/api/**/route.ts`)
+
+- `app` 디렉터리 아래 `app/api/.../route.ts` 파일로 정의
+- 각 HTTP 메서드별로 함수를 export
+
+```ts
+// app/api/example/route.ts
+export async function GET(request: Request) {
+  // 요청 처리
+  return new Response('OK')
+}
+```
+
+- Node.js 또는 Edge Runtime에서 실행 가능
+- JSON, 텍스트, 파일, 이미지 등 다양한 응답을 반환할 수 있음
+
+### 2.2 Proxy (`proxy.ts`)
+
+- 프로젝트 루트에 하나의 `proxy.ts`만 둘 수 있음
+- `config.matcher`로 어떤 경로의 요청을 가로챌지 지정
+- 요청이 특정 라우트에 도달하기 전에 인증/검증/리다이렉트/리라이트 등을 처리
+
+### 2.3 NextRequest / NextResponse
+
+- Web 표준 `Request`/`Response`를 확장한 타입
+- `NextRequest.nextUrl`로 pathname, searchParams 등에 쉽게 접근
+- `NextResponse.redirect`, `NextResponse.rewrite`, `NextResponse.json`, `NextResponse.next` 등의 헬퍼 제공
+
+---
+
+## 3. Public Endpoint로서의 Route Handler
+
+### 3.1 기본 구조
+
+```ts
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    // 유효성 검사 및 도메인 로직 수행
+    return Response.json({ success: true })
+  } catch (error) {
+    // 내부 에러 메시지를 그대로 노출하지 않도록 주의
+    return Response.json({ success: false, message: 'Internal error' }, { status: 500 })
+  }
+}
+```
+
+- HTTP 메서드(GET, POST, PUT, DELETE 등)별 함수로 구현
+- 에러 시 **내부 구현 정보나 stack trace를 응답에 노출하지 않도록** 조심해야 합니다.
+- 인증이 필요한 리소스의 경우 헤더/쿠키/세션 등을 검증 후 401/403 반환
+
+### 3.2 사용 시나리오
+
+- 프론트엔드에서 사용하는 전용 API 설계
+- 클라이언트와 통신하는 JSON 기반 REST/GraphQL 엔드포인트
+- 폼 제출, 데이터 업데이트, 비동기 작업 트리거 등
+
+---
+
+## 4. 다양한 콘텐츠 타입 응답
+
+Route Handler는 UI가 아닌 **콘텐츠 리소스**를 반환할 수 있습니다.
+
+- JSON (`Response.json`, `NextResponse.json`)
+- 텍스트(`text/plain`)
+- XML/RSS
+- 이미지, 바이너리 파일(다운로드)
+- 기타 커스텀 MIME 타입
+
+또한 Next.js는 파일 시스템 규칙으로 몇 가지 **특수 리소스**를 제공합니다.
+
+- `app/sitemap.ts` / `app/sitemap.xml`: 사이트맵
+- `app/opengraph-image.tsx`: 오픈 그래프 이미지
+- `app/robots.txt`, `app/manifest.json`, `app/icon.png` 등
+- 커스텀 예: `app/rss.xml/route.ts`, `app/.well-known/.../route.ts`, `app/llms.txt/route.ts` 등
+
+> 마크업(HTML, XML, RSS 등)을 직접 생성할 때는 **입력 데이터에 대한 XSS 방지 처리**가 필요합니다.
+
+---
+
+## 5. Request Payload 읽기
+
+Route Handler에서 요청 바디는 `Request` 인스턴스의 메서드로 읽습니다.
+
+- `request.json()` : JSON 바디 파싱
+- `request.formData()` : `multipart/form-data` 또는 `application/x-www-form-urlencoded`
+- `request.text()` : 일반 텍스트
+- `request.arrayBuffer()` : 바이너리 데이터
+
+**주의 사항**
+
+- `GET`, `HEAD` 요청은 보통 바디가 없으며, 쿼리 파라미터를 사용합니다.
+- 요청 바디는 한 번만 읽을 수 있으므로, 여러 번 사용해야 한다면 `request.clone()`으로 복제 후 사용해야 합니다.
+
+---
+
+## 6. 데이터 가공 및 어댑터 역할
+
+BFF의 핵심 역할 중 하나는 **프론트에서 쓰기 좋은 형태로 데이터를 가공**하는 것입니다.
+
+예시:
+
+- 여러 백엔드 API의 응답을 합쳐 하나의 응답으로 반환
+- 불필요한 내부 필드 제거 (내부 ID, 토큰 등)
+- 값 변환 (예: UTC → 로컬 타임존, 화씨 → 섭씨)
+- 에러 응답을 프론트에서 처리하기 쉬운 공통 형태로 매핑
+
+간단한 예:
+
+```ts
+export async function GET() {
+  const res = await fetch('https://example.com/weather')
+  const raw = await res.json()
+
+  const payload = {
+    temperature: raw.temp_celsius,
+    description: raw.summary,
+  }
+
+  return Response.json(payload)
+}
+```
+
+---
+
+## 7. Backend로 프록시하기
+
+Route Handler를 **백엔드 프록시**로 사용하면, 프론트 요청을 검증한 뒤 다른 서버로 그대로 전달할 수 있습니다.
+
+```ts
+// app/api/[...slug]/route.ts
+export async function POST(request: Request, { params }: { params: { slug: string[] } }) {
+  // 1. 요청 검증 (인증, rate limit 등)
+  // 2. 프록시할 URL 구성
+  const pathname = params.slug.join('/')
+  const target = new URL(pathname, 'https://api.example.com')
+
+  // 3. 원본 요청을 기반으로 새 Request 생성
+  const proxyRequest = new Request(target, request)
+
+  // 4. 실제 백엔드로 요청을 전달
+  return fetch(proxyRequest)
+}
+```
+
+- 이 레이어에서 **유효성 검사, 인증/인가, 로깅, rate limiting** 등을 공동으로 처리할 수 있습니다.
+- `next.config.js`의 `rewrites`나 전역 `proxy.ts` 파일을 사용하여 비슷한 프록시 패턴을 구현할 수도 있습니다.
+
+---
+
+## 8. NextRequest와 NextResponse 활용
+
+Next.js는 표준 `Request`/`Response`를 확장한 `NextRequest`, `NextResponse`를 제공합니다.
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl
+
+  if (searchParams.get('redirect')) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (searchParams.get('rewrite')) {
+    return NextResponse.rewrite(new URL('/docs', request.url))
+  }
+
+  return NextResponse.json({ pathname: request.nextUrl.pathname })
+}
+```
+
+- `nextUrl` 속성으로 파싱된 URL 정보를 쉽게 사용할 수 있습니다.
+- `NextResponse.json`, `NextResponse.redirect`, `NextResponse.rewrite` 등으로 응답 생성이 편리합니다.
+- `NextRequest`는 `Request`가 필요한 곳에 그대로 전달할 수 있고, `NextResponse` 역시 `Response`가 기대되는 곳에서 사용할 수 있습니다.
+
+---
+
+## 9. Webhooks와 Callback URL 처리
+
+### 9.1 Webhook
+
+- CMS, 결제, 인증 서비스 등에서 **이벤트가 발생할 때 호출하는 엔드포인트**입니다.
+- Next.js에서는 Route Handler로 웹훅을 수신하고, 내부 로직(예: 캐시 무효화, DB 갱신 등)을 수행할 수 있습니다.
+
+예시 아이디어:
+
+- `/app/webhook/route.ts`에서
+    - 쿼리 파라미터나 헤더의 시크릿 토큰 검증
+    - 적절한 `revalidateTag` 또는 `revalidatePath` 호출
+    - 성공/실패 여부를 JSON으로 응답
+
+### 9.2 Callback URL
+
+- OAuth 로그인 등 외부 서비스 플로우를 마친 후 사용자를 되돌려보내는 URL
+- 예: `/app/auth/callback/route.ts`에서 `session_token`, `redirect_url`을 쿼리로 받고, 쿠키를 설정한 뒤 적절한 페이지로 리다이렉트
+
+---
+
+## 10. Redirect와 Proxy 파일
+
+### 10.1 Redirect
+
+Route Handler에서 `redirect` 함수를 사용해 간단히 리다이렉트할 수 있습니다.
+
+```ts
+import { redirect } from 'next/navigation'
+
+export async function GET() {
+  redirect('https://nextjs.org/')
+}
+```
+
+- 서버에서 바로 리다이렉트가 수행되며, 클라이언트는 최종 목적지로 이동합니다.
+- 영구/일시 리다이렉트는 `permanentRedirect` 등의 API를 참고합니다.
+
+### 10.2 전역 `proxy.ts`
+
+- 한 프로젝트당 하나만 둘 수 있는 전역 Proxy 파일
+- `export const config = { matcher: '/api/:function*' }` 형태로 어떤 경로에 적용할지 지정
+- 예시:
+    - 인증되지 않은 요청을 401로 차단
+    - 특정 경로를 다른 도메인으로 rewrite
+    - 구 버전 문서 URL을 새 URL로 redirect
+
+```ts
+import { NextResponse } from 'next/server'
+
+export const config = {
+  matcher: '/api/:function*',
+}
+
+export function proxy(request: any) {
+  // 예: 인증 체크
+  // if (!isAuthenticated(request)) {
+  //   return NextResponse.json({ success: false }, { status: 401 })
+  // }
+
+  // 특정 경로 리라이트 예시
+  if (request.nextUrl.pathname === '/proxy-this-path') {
+    const rewriteUrl = new URL('https://nextjs.org')
+    return NextResponse.rewrite(rewriteUrl)
+  }
+
+  return NextResponse.next()
+}
+```
+
+---
+
+## 11. 보안 모범 사례
+
+### 11.1 헤더 다루기
+
+- Proxy 또는 Route Handler에서 **요청 헤더**를 그대로 응답 헤더로 복사하지 않도록 주의해야 합니다.
+- upstream(백엔드)으로 전달할 헤더와 실제 응답 헤더를 명확히 구분합니다.
+- 민감한 정보(토큰, 세션 ID 등)가 응답 헤더에 포함되면 브라우저에서 노출됩니다.
+
+### 11.2 Rate Limiting
+
+- 클라이언트 IP, 사용자 ID, 토큰 등을 기준으로 rate limit을 적용할 수 있습니다.
+- 코드 레벨 rate limit 외에도, 호스팅 서비스(예: Vercel, 클라우드 프록시)가 제공하는 레이트 리밋 기능을 함께 사용하는 것을 권장합니다.
+
+### 11.3 Payload 검증
+
+- 들어오는 모든 요청 바디는 **절대 신뢰하지 않습니다.**
+- 아래를 반드시 검토합니다.
+    - Content-Type
+    - 바디 크기 제한(DoS 방지)
+    - 필드별 유효성 검사
+    - XSS, SQL 인젝션 등에 대한 방어
+- 큰 파일 업로드는 S3와 같은 별도 저장소에 직접 업로드하게 하고, 서버에는 업로드된 파일의 URI만 저장하는 방식이 효율적입니다.
+
+### 11.4 보호된 자원 접근
+
+- 인증/인가를 확실히 검증한 뒤에만 민감한 데이터나 동작을 허용해야 합니다.
+- Proxy를 사용한다고 해서 자동으로 안전해지는 것은 아닙니다.
+- 응답 및 서버 로그에서 불필요한 민감 정보를 제거하고, API 키·비밀번호는 주기적으로 교체합니다.
+
+---
+
+## 12. Preflight 요청과 CORS
+
+- 브라우저는 교차 출처 요청 시 `OPTIONS` 메서드를 사용해 사전 확인(Preflight)을 보냅니다.
+- Route Handler에서 `OPTIONS`를 직접 정의하지 않으면,
+    - Next.js가 자동으로 `Allow` 헤더를 설정하여 허용 가능한 메서드 목록을 알려줍니다.
+- CORS 설정은 별도 문서를 참고하여 Origin, 메서드, 헤더를 적절히 제한해야 합니다.
+
+---
+
+## 13. 라이브러리 패턴
+
+많은 써드파티 라이브러리는 Route Handler나 Proxy를 쉽게 붙이기 위해 **팩토리 함수**를 제공합니다.
+
+```ts
+// app/api/[...path]/route.ts
+import { createHandler } from 'third-party-library'
+
+const handler = createHandler({
+  // 옵션
+})
+
+export const GET = handler
+export { handler as POST }
+```
+
+- 하나의 핸들러를 여러 HTTP 메서드에서 재사용할 수 있습니다.
+- Proxy에서도 비슷한 패턴으로 `createMiddleware()` 등을 사용하는 라이브러리가 있습니다.
+
+---
+
+## 14. Caveats (주의사항)
+
+### 14.1 Server Components와 Route Handler
+
+- 가능한 경우, **Server Component에서 Route Handler를 거치지 말고 직접 데이터 소스에 `fetch`하는 것**이 권장됩니다.
+- 빌드 타임에 정적으로 렌더링되는 Server Component가 Route Handler를 호출하면,
+    - 빌드 시점에는 앱 서버가 떠 있지 않기 때문에 요청이 실패할 수 있습니다.
+- 요청 시점에 동적으로 렌더링하는 경우에도,
+    - Server Component → Route Handler → 백엔드 순으로 HTTP 라운드 트립이 늘어나 성능에 불리할 수 있습니다.
+
+### 14.2 Server Actions
+
+- Server Actions의 주요 목적은 **데이터 변경(쓰기)**입니다.
+- 조회용 데이터 요청까지 Server Action으로 통일하면,
+    - 실행이 큐에 직렬로 쌓여 병렬성이 떨어질 수 있습니다.
+- 데이터 조회는 가능하면 Server Component의 `fetch` 또는 별도의 클라이언트 라이브러리(SWR, React Query 등)를 사용하는 것이 일반적입니다.
+
+### 14.3 `export` 모드 (Static Export)
+
+- `next export`는 **런타임 서버 없이 정적 파일만 빌드**합니다.
+- 이 모드에서는 다음 기능이 제한됩니다.
+    - 동적인 Route Handler
+    - Proxy
+    - Server Actions 등 **런타임 서버를 필요로 하는 기능**
+- 다만, 아래와 같이 `GET` Route Handler에서 `dynamic = 'force-static'`을 사용하면 정적 파일(JSON, TXT 등)을 생성하는 용도로 활용할 수 있습니다.
+
+```ts
+// app/hello-world/route.ts
+export const dynamic = 'force-static'
+
+export function GET() {
+  return new Response('Hello World')
+}
+```
+
+---
+
+## 15. 정리
+
+- Next.js는 **프론트엔드와 매우 가까운 백엔드 계층(BFF)**을 구현하기에 적합한 도구를 제공합니다.
+- Route Handlers와 Proxy를 사용하면
+    - 외부/내부 백엔드를 프록시하거나
+    - 프론트 친화적인 DTO로 응답을 가공하고
+    - 인증, 로깅, rate limiting, 보안 등을 중앙에서 처리할 수 있습니다.
+- 다만, Server Components와의 상호작용, export 모드의 제약, CORS/보안 이슈 등을 고려하여
+    - 언제 BFF를 쓰고
+    - 언제 데이터 소스에 직접 `fetch`할지
+      를 설계하는 것이 중요합니다.

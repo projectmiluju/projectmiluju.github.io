@@ -1,0 +1,184 @@
+---
+title: "Next.js Package Bundling 가이드 정리"
+date: 2025-02-10
+summary: "**Bundling**은 앱 코드와 의존성(패키지)을 묶어 **클라이언트/서버가 실행하기 좋은 형태의 산출물**로 만드는 과정입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 30
+---
+
+# Next.js Package Bundling 가이드 정리
+
+## 1. Package Bundling 개요
+
+**Bundling**은 앱 코드와 의존성(패키지)을 묶어 **클라이언트/서버가 실행하기 좋은 형태의 산출물**로 만드는 과정입니다.
+
+- 번들이 작을수록 로딩이 빨라지고, JS 실행 비용이 줄어 **Core Web Vitals 개선**에 도움이 됩니다.
+- Next.js는 기본적으로 **코드 스플리팅, 트리 셰이킹** 등으로 번들을 자동 최적화하지만,
+  특정 상황에서는 **수동 최적화/분석**이 필요합니다.
+
+이 문서는 아래를 다룹니다.
+
+1. Turbopack 기반 **Next.js Bundle Analyzer(실험 기능)** 사용법
+2. Webpack용 **@next/bundle-analyzer** 사용법
+3. 흔한 “번들 커짐” 원인과 해결 패턴
+
+---
+
+## 2. 번들 분석 도구
+
+### 2.1 Next.js Bundle Analyzer (Experimental, Turbopack)
+
+- **v16.1+**에서 사용 가능
+- Turbopack의 **module graph**와 통합되어, 서버/클라이언트 모듈을 구분해서 보고 **import chain(어디서 끌고 왔는지)**까지 추적 가능
+
+#### Step 1: Turbopack Bundle Analyzer 실행
+
+```bash
+npx next experimental-analyze
+```
+
+실행 후 브라우저에서 인터랙티브 UI를 열어 분석합니다.
+
+#### Step 2: 모듈 필터링/탐색
+
+UI에서 다음 기준으로 필터링할 수 있습니다.
+
+- route
+- environment (client / server)
+- type (JavaScript, CSS, JSON 등)
+- file 검색
+
+#### Step 3: Import chain 추적
+
+트리맵의 모듈을 클릭하면
+
+- 모듈 크기
+- 전체 import chain
+- 앱에서 사용되는 위치
+
+를 확인할 수 있습니다.
+
+#### Step 4: 결과를 디스크에 저장(공유/전후 비교)
+
+```bash
+npx next experimental-analyze --output
+```
+
+- 결과는 `.next/diagnostics/analyze`에 저장됩니다.
+- 예: 리팩토링 전/후를 비교하려면 디렉토리를 복사해 보관합니다.
+
+```bash
+cp -r .next/diagnostics/analyze ./analyze-before-refactor
+```
+
+---
+
+### 2.2 `@next/bundle-analyzer` (Webpack 플러그인)
+
+Webpack 번들을 시각화해 “어떤 패키지가 얼마나 차지하는지” 확인할 수 있습니다.
+
+#### Step 1: 설치
+
+```bash
+npm i @next/bundle-analyzer
+# or
+yarn add @next/bundle-analyzer
+# or
+pnpm add @next/bundle-analyzer
+```
+
+#### Step 2: next.config.js에 연결
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+module.exports = withBundleAnalyzer(nextConfig)
+```
+
+#### Step 3: 리포트 생성
+
+```bash
+ANALYZE=true npm run build
+# or
+ANALYZE=true yarn build
+# or
+ANALYZE=true pnpm build
+```
+
+- 빌드 후 브라우저 탭이 열리며(문서 기준 3개 탭) 번들을 확인할 수 있습니다.
+
+---
+
+## 3. 큰 번들 최적화 패턴
+
+### 3.1 “Exports가 너무 많은” 패키지 (아이콘/유틸 라이브러리 등)
+
+아이콘 라이브러리처럼 **수백 개 export**를 가진 패키지를 “named export”로 편하게 쓰면,
+실제로는 사용하지 않는 코드까지 번들에 섞이는 경우가 생길 수 있습니다.
+
+이때 `experimental.optimizePackageImports`로 **사용한 모듈만 로드**되도록 최적화할 수 있습니다.
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    optimizePackageImports: ['icon-library'],
+  },
+}
+module.exports = nextConfig
+```
+
+> 참고: Next.js가 자동 최적화하는 라이브러리도 있어, 그런 경우는 목록에 추가할 필요가 없습니다(문서에 지원 리스트가 따로 있음).
+
+---
+
+### 3.2 Heavy client workloads (클라이언트 컴포넌트에서 “비싼 변환” 수행)
+
+문법 하이라이팅, 차트 렌더링, 마크다운 파싱 등은 종종 “데이터 → UI 변환”을 위해 큰 라이브러리를 끌고 오게 됩니다.
+
+- **브라우저 API/유저 인터랙션이 필요 없다면**
+  해당 작업을 **Server Component**로 옮겨 클라이언트 번들에서 제외하는 것이 효과적입니다.
+
+예시(문서 요지):
+
+- Client Component에서 prism 기반 하이라이팅을 하면, 하이라이팅 라이브러리 전체가 클라이언트 번들에 포함됨
+- Server Component에서 Shiki 등을 사용해 **서버에서 HTML로 변환**하고, 클라이언트에는 “완성된 마크업”만 전달
+
+핵심은:
+
+- “표시 결과가 단순한데, 변환 과정이 무겁다” → 서버로 옮길 후보
+
+---
+
+### 3.3 서버 번들에서 특정 패키지 제외하기
+
+Server Components / Route Handlers 내부에서 import된 패키지는 기본적으로 Next.js가 번들링합니다.
+
+서버에서 특정 패키지를 번들에 넣지 않고(= 외부 의존성으로 유지하고) 싶다면,
+`serverExternalPackages`를 사용합니다.
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['package-name'],
+}
+
+module.exports = nextConfig
+```
+
+---
+
+## 4. 정리 및 활용 팁
+
+- 최적화는 “감”이 아니라 **분석(Analyzer) → 원인 분류 → 조치 → 전/후 비교**로 가야 합니다.
+- 큰 번들이 보이면 우선 아래부터 점검하세요.
+    - 아이콘/유틸 패키지 “export 폭발” → `optimizePackageImports`
+    - 클라이언트에서만 굳이 돌릴 필요 없는 변환 → Server Component로 이동
+    - 서버 번들에서 꼭 묶을 필요 없는 패키지 → `serverExternalPackages`

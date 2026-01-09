@@ -1,0 +1,160 @@
+---
+title: "Next.js App Router Migration 가이드 정리"
+date: 2025-02-03
+summary: "**App Router**는 Next.js의 최신 라우팅/렌더링 아키텍처입니다."
+tags: ["Next.js", "React", "Frontend"]
+category: "cs"
+series: "Next.js Guides"
+order: 24
+---
+
+# Next.js App Router Migration 가이드 정리
+
+## 1. 개요
+
+**App Router**는 Next.js의 최신 라우팅/렌더링 아키텍처입니다.  
+이 가이드는 기존 프로젝트(특히 Pages Router 또는 혼합 구조)를 **App Router로 점진적으로 이전**할 때 무엇을 어떤 순서로 바꾸면 좋은지 정리합니다.
+
+핵심 아이디어:
+
+- 한 번에 갈아엎기보다 **route 단위로 점진 전환**이 가능
+- App Router의 기본 단위는 **폴더(route segment) + `page.tsx` + `layout.tsx`**
+- 서버 컴포넌트 / 스트리밍 / `fetch` 기반 데이터 패칭 / Route Handlers 같은 기능이 자연스럽게 붙습니다
+
+---
+
+## 2. 마이그레이션 접근 전략
+
+### 2.1 점진적 전환(추천)
+
+- 기존 `pages/`를 유지한 채 `app/`를 추가해서 **신규/일부 라우트부터 App Router로 전환**
+- 안정화 후 점차 `pages/` 범위를 줄여 전체를 App Router로 이전
+
+장점:
+
+- 리스크 분산
+- PR 크기 감소
+- 회귀 테스트 범위를 좁히기 쉬움
+
+---
+
+## 3. Step-by-step 체크리스트
+
+### Step 1: 프로젝트/의존성 업데이트
+
+- Node / Next.js / React 버전 조건을 App Router 권장 버전에 맞추기
+- ESLint 설정(Next.js 권장 규칙)도 함께 갱신
+
+---
+
+### Step 2: `app/` 디렉터리 추가 + Root Layout 만들기
+
+App Router는 **`app/layout.tsx`(Root Layout)**가 필수입니다.
+
+- `_document.tsx` / `_app.tsx`에서 하던 HTML 뼈대/전역 Provider/전역 CSS 등을
+  **`layout.tsx`로 이동**하는 방향으로 전환합니다.
+
+예시 스케치:
+
+```tsx
+// app/layout.tsx
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: '...',
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ko">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+---
+
+### Step 3: 라우팅/네비게이션 API 전환
+
+App Router에서는 라우터 관련 훅이 `next/navigation`에 있고, Pages Router(`next/router`)와 사용 방식이 다릅니다.
+
+주요 변화 예시:
+
+- `useRouter()` import 경로 변경: `next/router` → `next/navigation`
+- pathname, searchParams, params는 **전용 훅**(`usePathname`, `useSearchParams`, `useParams`)을 사용
+- 위 훅들은 **Client Component**에서만 사용 가능하므로, 파일 상단에 `'use client'`가 필요할 수 있음
+
+---
+
+### Step 4: 데이터 패칭 전환
+
+Pages Router의 `getServerSideProps`, `getStaticProps`, `getStaticPaths`는 App Router에서 직접 사용하지 않습니다.  
+대신:
+
+- 기본은 **Server Component**에서 `fetch()`로 데이터 패칭
+- 캐싱/리밸리데이션은 `fetch` 옵션 및 라우트 세그먼트 설정으로 제어
+- 페이지/레이아웃은 async 가능(서버에서 실행)
+
+스케치:
+
+```tsx
+// app/posts/[slug]/page.tsx
+export default async function Page({ params }: { params: { slug: string } }) {
+  const res = await fetch(`https://example.com/api/posts/${params.slug}`, {
+    // 필요 시 캐시/리밸리데이션 옵션 설정
+    // next: { revalidate: 60 },
+  })
+  const post = await res.json()
+
+  return <article>{post.title}</article>
+}
+```
+
+---
+
+### Step 5: `<head>` 관리 방식 변경
+
+App Router에서는 “각 페이지에서 `next/head`로 head를 조작”하기보다,
+**Metadata API**(또는 `generateMetadata`)를 통해 선언적으로 관리하는 방식이 자연스럽습니다.
+
+- SEO(타이틀/디스크립션/OG) 관리가 일관됨
+- 페이지별/세그먼트별 메타데이터 병합 규칙이 존재
+
+---
+
+### Step 6: API Routes → Route Handlers(선택)
+
+기존 `pages/api/*`를 사용 중이라면 App Router 방식의 **Route Handler**(`app/api/**/route.ts`)로 옮길 수 있습니다.
+
+예시:
+
+```ts
+// app/api/health/route.ts
+export async function GET() {
+  return Response.json({ ok: true })
+}
+```
+
+---
+
+### Step 7: 점진적 최적화
+
+App Router의 장점은 “이전 후에” 더 크게 체감됩니다.
+
+- 로딩/스트리밍 UI: `loading.tsx`, React Suspense
+- 서버/클라 분리: 서버 컴포넌트로 불필요한 번들 감소
+- 라우트 단위 캐싱/ISR(재생성) 적용
+- 이미지/폰트/스크립트 최적화(Next 내장 기능)
+
+---
+
+## 4. 마이그레이션 시 흔한 함정
+
+- 라우팅 훅을 Server Component에서 쓰려다 오류(→ `'use client'` 필요)
+- 데이터 패칭을 클라이언트에서 하던 패턴이 그대로 남아 “워터폴”이 유지됨
+- 메타데이터/아이콘/robots 같은 파일을 기존 방식에서 App Router 규칙으로 옮기지 않아 SEO 설정 누락
+- 환경 변수 노출 규칙(NEXT_PUBLIC_) 혼동
+
+---
