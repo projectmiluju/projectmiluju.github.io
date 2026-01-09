@@ -1,0 +1,27 @@
+---
+title: "Java에서 Checked Exception과 Unchecked Exception이란?"
+date: 2025-04-02
+summary: "매일메일CS"
+tags: ["Java", "Exception", "Backend"]
+category: "cs"
+series: "매일메일 백엔드"
+---
+
+## Checked Exception과 Unchecked Exception
+
+***
+> Checked Exception : 컴파일 시점에 확인되고, 반드시 처리해야 하는 예외 ex)`IOException` `SQLException`     
+>
+> Unchecked Exception : 런타임 시점에 발생하는 예외 ex)`RuntimeException`
+***
+
+## 각각 언제 사용할까?
+> Checked Exception : 파일 입출력, 네트워크 통신 등 외부 환경과의 상호작용에서 발생할 가능성이 높은 예외에 적합   
+> Unchecked Exception : 코드 오류, 논리적 결함 등 프로그래머의 실수로 인해 발생할 수 있는 예외에 적합
+
+***
+
+## Error와 Exception의 차이는?
+> Error : 주로 JVM에서 발생하는 심각한 문제, 회복이 어려운 오류 `OutOfMemoryError` `StackOverflowError`
+> 
+> Exception : 프로그램 실행 중 발생할 수 있는 오류 상황, 대부분의 경우 회복 가능성있는 오류
