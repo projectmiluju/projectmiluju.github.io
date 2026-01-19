@@ -11,6 +11,13 @@ const projects = (await getCollection('projects', ({ data }) => !data.draft))
   .sort((a, b) => a.data.order - b.data.order)
   .slice(0, 3);
 
+// Get all projects for featured section
+const allProjects = (await getCollection('projects', ({ data }) => !data.draft))
+  .sort((a, b) => a.data.order - b.data.order);
+
+// Featured project (first one by order)
+const featuredProject = allProjects[0];
+
 // Get latest published blog posts
 const posts = (await getCollection('blog', ({ data }) => !data.draft))
   .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
@@ -21,20 +28,58 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
   <!-- Hero Section -->
   <section class="hero">
     <div class="container">
-      <div class="hero-content animate-slide-up">
-        <h1 class="hero-title">
-          안녕하세요,<br />
-          <span class="highlight">Backend/Infra</span> 중심<br />
-          풀스택 엔지니어입니다.
-        </h1>
-        <p class="hero-desc">
-          신뢰성 있는 시스템 설계, 성능 최적화, 자동화된 인프라 구축을 추구합니다.<br />
-          복잡한 문제를 단순하게 해결하는 것을 좋아합니다.
-        </p>
-        <div class="hero-actions">
-          <a href="/projects" class="btn btn-primary">프로젝트 보기</a>
-          <a href="/about" class="btn btn-secondary">소개</a>
+      <div class="hero-content">
+        <div class="hero-text animate-slide-up">
+          <p class="hero-greeting">안녕하세요, 저는</p>
+          <h1 class="hero-title">
+            <span class="highlight">Backend/Infra</span> 중심<br />
+            풀스택 엔지니어입니다
+          </h1>
+          <p class="hero-desc">
+            신뢰할 수 있는 시스템 설계와 자동화를 추구합니다.<br />
+            복잡한 문제를 단순하게 해결하고, 팀의 생산성을 높이는 일에 집중합니다.
+          </p>
+          
+          <div class="hero-actions">
+            <a href="/projects" class="btn btn-primary">
+              <span>Projects</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </a>
+            <a href={`mailto:${siteConfig.author.email}`} class="btn btn-secondary">
+              <span>Contact</span>
+            </a>
+            <a href={siteConfig.links.github} class="btn btn-ghost" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+            </a>
+          </div>
         </div>
+        
+        <!-- Featured Project Quick Link -->
+        {featuredProject && (
+          <div class="hero-featured reveal">
+            <span class="featured-label">Featured Project</span>
+            <a href={`/projects/${featuredProject.slug}`} class="featured-card card-3d">
+              <div class="featured-content">
+                <h3 class="featured-title">{featuredProject.data.title}</h3>
+                <p class="featured-role">{featuredProject.data.role}</p>
+                <div class="featured-stack">
+                  {featuredProject.data.stack.slice(0, 4).map((tech) => (
+                    <span class="stack-tag">{tech}</span>
+                  ))}
+                </div>
+              </div>
+              <div class="featured-arrow">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </div>
+            </a>
+          </div>
+        )}
       </div>
     </div>
   </section>
@@ -42,10 +87,12 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
   <!-- Strengths Section -->
   <section class="section strengths">
     <div class="container">
-      <h2 class="section-title">핵심 역량</h2>
+      <h2 class="section-title reveal">핵심 역량</h2>
       <div class="strengths-grid">
-        {siteConfig.strengths.map((strength) => (
-          <StrengthCard {...strength} />
+        {siteConfig.strengths.map((strength, index) => (
+          <div class={`reveal stagger-${index + 1}`}>
+            <StrengthCard {...strength} />
+          </div>
         ))}
       </div>
     </div>
@@ -54,22 +101,29 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
   <!-- Featured Projects -->
   <section class="section projects">
     <div class="container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <h2 class="section-title">주요 프로젝트</h2>
-        <a href="/projects" class="section-link">전체 보기 →</a>
+        <a href="/projects" class="section-link link-underline">
+          전체 보기
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
       </div>
       <div class="projects-grid">
-        {projects.map((project) => (
-          <ProjectCard
-            title={project.data.title}
-            slug={project.slug}
-            period={project.data.period}
-            role={project.data.role}
-            stack={project.data.stack}
-            highlights={project.data.highlights}
-            metrics={project.data.metrics}
-            cover={project.data.cover}
-          />
+        {projects.map((project, index) => (
+          <div class={`reveal stagger-${index + 1}`}>
+            <ProjectCard
+              title={project.data.title}
+              slug={project.slug}
+              period={project.data.period}
+              role={project.data.role}
+              stack={project.data.stack}
+              highlights={project.data.highlights}
+              metrics={project.data.metrics}
+              cover={project.data.cover}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -78,20 +132,27 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
   <!-- Latest Blog Posts -->
   <section class="section blog">
     <div class="container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <h2 class="section-title">최신 글</h2>
-        <a href="/blog" class="section-link">전체 보기 →</a>
+        <a href="/blog" class="section-link link-underline">
+          전체 보기
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
       </div>
       <div class="blog-grid">
-        {posts.map((post) => (
-          <BlogCard
-            title={post.data.title}
-            slug={post.slug}
-            date={post.data.date}
-            summary={post.data.summary}
-            category={post.data.category}
-            tags={post.data.tags}
-          />
+        {posts.map((post, index) => (
+          <div class={`reveal stagger-${index + 1}`}>
+            <BlogCard
+              title={post.data.title}
+              slug={post.slug}
+              date={post.data.date}
+              summary={post.data.summary}
+              category={post.data.category}
+              tags={post.data.tags}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -101,25 +162,42 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
 <style>
   /* Hero Section */
   .hero {
-    padding: var(--space-20) 0;
-    min-height: 60vh;
+    padding: var(--space-16) 0 var(--space-20);
+    min-height: calc(100vh - var(--header-height) - 100px);
     display: flex;
     align-items: center;
   }
 
   .hero-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-10);
+    max-width: 800px;
+  }
+
+  .hero-text {
     max-width: 640px;
   }
 
+  .hero-greeting {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-2);
+  }
+
   .hero-title {
-    font-size: clamp(2rem, 5vw, 3rem);
+    font-size: clamp(2.25rem, 6vw, var(--text-5xl));
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.15;
     margin-bottom: var(--space-6);
+    letter-spacing: -0.02em;
   }
 
   .hero-title .highlight {
-    color: var(--color-accent);
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .hero-desc {
@@ -127,72 +205,200 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
     color: var(--color-text-muted);
     line-height: 1.7;
     margin-bottom: var(--space-8);
+    max-width: 540px;
   }
 
   .hero-actions {
     display: flex;
-    gap: var(--space-4);
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
   }
 
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: var(--space-2);
     padding: var(--space-3) var(--space-6);
     font-size: var(--text-base);
     font-weight: 500;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     text-decoration: none;
-    transition: all var(--transition-fast);
+    transition: all var(--transition-base);
+    border: 1px solid transparent;
+  }
+
+  .btn svg {
+    transition: transform var(--transition-base);
   }
 
   .btn-primary {
     background-color: var(--color-accent);
     color: white;
+    box-shadow: 0 2px 8px var(--color-accent-glow);
   }
 
   .btn-primary:hover {
     background-color: var(--color-accent-hover);
     color: white;
+    box-shadow: 0 4px 16px var(--color-accent-glow);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:hover svg {
+    transform: translateX(3px);
   }
 
   .btn-secondary {
     background-color: var(--color-bg-alt);
     color: var(--color-text);
-    border: 1px solid var(--color-border);
+    border-color: var(--color-border);
   }
 
   .btn-secondary:hover {
     border-color: var(--color-accent);
     color: var(--color-accent);
+    background-color: var(--color-accent-light);
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-muted);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .btn-ghost:hover {
+    color: var(--color-text);
+    background-color: var(--color-bg-alt);
+  }
+
+  /* Featured Project Card */
+  .hero-featured {
+    margin-top: var(--space-4);
+  }
+
+  .featured-label {
+    display: inline-block;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-3);
+  }
+
+  .featured-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-6);
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    text-decoration: none;
+    color: inherit;
+    box-shadow: var(--shadow-card);
+    transition: all var(--transition-base);
+  }
+
+  .featured-card:hover {
+    border-color: var(--color-accent);
+    box-shadow: var(--shadow-card-hover), 0 0 0 1px var(--color-accent-glow);
+  }
+
+  .featured-content {
+    flex: 1;
+  }
+
+  .featured-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin-bottom: var(--space-1);
+  }
+
+  .featured-role {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+
+  .featured-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .featured-stack .stack-tag {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+    background-color: var(--color-accent-light);
+    color: var(--color-accent);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+  }
+
+  .featured-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: var(--color-bg);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    transition: all var(--transition-base);
+    flex-shrink: 0;
+  }
+
+  .featured-card:hover .featured-arrow {
+    background-color: var(--color-accent);
+    color: white;
+    transform: translateX(4px);
   }
 
   /* Section Styles */
   .section {
-    padding: var(--space-16) 0;
+    padding: var(--space-20) 0;
   }
 
   .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--space-10);
   }
 
   .section-title {
-    font-size: var(--text-2xl);
+    font-size: var(--text-3xl);
     font-weight: 600;
     margin: 0;
+    letter-spacing: -0.01em;
   }
 
   .section-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
     font-size: var(--text-sm);
+    font-weight: 500;
     color: var(--color-accent);
     text-decoration: none;
+    transition: gap var(--transition-base);
   }
 
   .section-link:hover {
-    text-decoration: underline;
+    gap: var(--space-3);
+  }
+
+  .section-link svg {
+    transition: transform var(--transition-base);
+  }
+
+  .section-link:hover svg {
+    transform: translateX(2px);
   }
 
   /* Strengths Grid */
@@ -202,13 +408,15 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
 
   .strengths .section-title {
     text-align: center;
-    margin-bottom: var(--space-10);
+    margin-bottom: var(--space-12);
   }
 
   .strengths-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-6);
+    max-width: 1000px;
+    margin: 0 auto;
   }
 
   /* Projects Grid */
@@ -228,16 +436,51 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
   /* Responsive */
   @media (max-width: 768px) {
     .hero {
-      padding: var(--space-12) 0;
+      padding: var(--space-10) 0 var(--space-16);
       min-height: auto;
     }
 
+    .hero-content {
+      gap: var(--space-8);
+    }
+
+    .hero-greeting {
+      font-size: var(--text-base);
+    }
+
+    .hero-desc {
+      font-size: var(--text-base);
+    }
+
     .hero-actions {
-      flex-direction: column;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: var(--space-3) var(--space-5);
+      font-size: var(--text-sm);
+    }
+
+    .featured-card {
+      padding: var(--space-4);
+    }
+
+    .featured-title {
+      font-size: var(--text-base);
+    }
+
+    .section {
+      padding: var(--space-16) 0;
+    }
+
+    .section-title {
+      font-size: var(--text-2xl);
     }
 
     .strengths-grid {
       grid-template-columns: 1fr;
+      gap: var(--space-4);
     }
 
     .projects-grid,

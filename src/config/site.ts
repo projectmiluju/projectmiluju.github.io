@@ -17,18 +17,21 @@ export const siteConfig = {
   strengths: [
     {
       title: '신뢰성',
-      description: '안정적인 시스템 설계와 장애 대응 경험으로 99.9% 이상의 가용성을 달성합니다.',
+      description: 'Docker 샌드박스, JWT 인증, 동시성 제어 등 안전하고 안정적인 시스템을 설계합니다.',
       icon: 'shield',
+      evidence: 'DeepWebIDE - Docker 격리 환경 구현, DDOK - 비관적 락 기반 동시성 처리',
     },
     {
       title: '성능',
-      description: '병목 분석과 최적화를 통해 응답 시간 50% 이상 개선한 경험이 있습니다.',
+      description: 'Redis 캐싱, N+1 해결, 실시간 동기화 최적화로 빠른 사용자 경험을 제공합니다.',
       icon: 'zap',
+      evidence: '쓱관 - 랭킹 조회 3초→50ms, DDOK - 프로젝트 조회 2초→200ms',
     },
     {
       title: '자동화',
-      description: 'CI/CD 파이프라인과 IaC로 배포 시간을 80% 단축하고 휴먼 에러를 최소화합니다.',
+      description: 'GitHub Actions CI/CD, AWS 인프라 구축으로 배포 자동화와 운영 효율을 높입니다.',
       icon: 'cog',
+      evidence: '4개 프로젝트 모두 GitHub Actions 기반 자동 배포 파이프라인 구축',
     },
   ],
   // 블로그 카테고리
