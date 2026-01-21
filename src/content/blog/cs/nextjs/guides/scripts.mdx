@@ -1,0 +1,193 @@
+---
+title: "Next.js Scripts 가이드 정리"
+date: 2026-01-22
+summary: "**Scripts**는 서드파티 스크립트 로딩 전략을 최적화하여 성능을 향상시킬 수 있습니다. Next.js는 next/script 컴포넌트를 통해 로딩 우선순위와 시점을 제어합니다."
+tags: ["Next.js", "React", "Frontend", "Scripts", "Performance"]
+category: "cs"
+series: "Next.js Guides"
+order: 36
+---
+
+# Next.js Scripts 가이드 정리
+
+## 1. Scripts 개요
+
+Next.js는 `next/script` 컴포넌트를 통해 **서드파티 스크립트 로딩 전략을 최적화**할 수 있습니다.
+
+- 브라우저가 스크립트를 언제/어떻게 로드할지 제어하여 성능(특히 LCP/TTI)에 영향을 줄 수 있음
+- `next/script`는 **로딩 우선순위/시점 제어 + 중복 로드 방지 + 최적화된 삽입**을 제공
+
+---
+
+## 2. 기본 사용법
+
+```tsx
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script src="https://example.com/script.js" />
+    </>
+  )
+}
+```
+
+---
+
+## 3. Step 1: 로딩 전략(strategy) 이해하기
+
+`strategy`로 스크립트 삽입 시점을 선택합니다.
+
+- `afterInteractive`(기본): 페이지가 인터랙티브해진 뒤 로드
+- `beforeInteractive`: 페이지 인터랙션 전에 필요한 스크립트(주의: 과도하면 성능 저하)
+- `lazyOnload`: 브라우저 idle 타이밍에 느긋하게 로드
+- `worker`: Web Worker로 오프로드(아래 참고)
+
+예시:
+
+```tsx
+<Script
+  src="https://example.com/analytics.js"
+  strategy="afterInteractive"
+/>
+```
+
+---
+
+## 4. Step 2: Layout Scripts (모든 라우트에 공통 적용)
+
+특정 스크립트가 **모든 페이지에서 필요**하다면 Layout에서 선언할 수 있습니다.
+
+```tsx
+// app/layout.tsx
+import Script from 'next/script'
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+
+        <Script src="https://example.com/script.js" strategy="afterInteractive" />
+      </body>
+    </html>
+  )
+}
+```
+
+---
+
+## 5. Step 3: Inline Script 사용
+
+외부 파일이 아니라 **인라인 JS**도 지원합니다.  
+단, Next.js가 스크립트를 추적/최적화할 수 있도록 **inline은 반드시 `id`가 필요**합니다.
+
+```tsx
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script id="show-banner">
+        {`document.getElementById('banner').classList.remove('hidden')`}
+      </Script>
+    </>
+  )
+}
+```
+
+또는:
+
+```tsx
+<Script
+  id="show-banner"
+  dangerouslySetInnerHTML={{
+    __html: `document.getElementById('banner').classList.remove('hidden')`,
+  }}
+/>
+```
+
+---
+
+## 6. Step 4: 로딩 이벤트 후 추가 코드 실행
+
+`onLoad`, `onReady`, `onError` 이벤트로 스크립트 로딩 후 로직을 붙일 수 있습니다.
+
+- `onLoad`: 스크립트 로딩 완료 후 1회 실행
+- `onReady`: 로딩 완료 후 + 컴포넌트가 마운트될 때마다 실행
+- `onError`: 로딩 실패 시 실행
+
+중요: 이 핸들러는 **Client Component**에서만 동작합니다.
+
+```tsx
+'use client'
+
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script
+        src="https://example.com/script.js"
+        onLoad={() => {
+          console.log('Script has loaded')
+        }}
+      />
+    </>
+  )
+}
+```
+
+---
+
+## 7. Step 5: Web Worker로 오프로드 (실험적)
+
+`strategy="worker"`를 쓰려면 `nextScriptWorkers` 설정이 필요합니다(실험적).  
+Next.js는 내부적으로 Partytown을 사용해 스크립트를 Worker에서 실행할 수 있게 합니다.
+
+```js
+// next.config.js
+module.exports = {
+  experimental: {
+    nextScriptWorkers: true,
+  },
+}
+```
+
+```tsx
+<Script src="https://example.com/analytics.js" strategy="worker" />
+```
+
+---
+
+## 8. Step 6: 추가 속성 전달
+
+`nonce`, `data-*` 같은 **표준 script DOM 속성**은 Script 컴포넌트에 그대로 전달하면, 최종 `<script>`에 자동으로 전달됩니다.
+
+```tsx
+import Script from 'next/script'
+
+export default function Page() {
+  return (
+    <>
+      <Script
+        src="https://example.com/script.js"
+        id="example-script"
+        nonce="XUENAJFW"
+        data-test="script"
+      />
+    </>
+  )
+}
+```
+
+---
+
+## 9. 정리 및 팁
+
+- **성능 최적화**를 위해 적절한 `strategy`를 선택하세요. `beforeInteractive`는 필요한 경우에만 사용하세요.
+- **Layout**에서 공통 스크립트를 선언하면 코드 중복을 피할 수 있습니다.
+- **Inline 스크립트**는 반드시 `id` 속성이 필요합니다.
+- **이벤트 핸들러**는 Client Component에서만 사용할 수 있습니다.
+- **Web Worker 전략**은 실험적 기능이므로 프로덕션에서 사용하기 전에 충분한 테스트를 하세요.
