@@ -1,0 +1,116 @@
+---
+title: "Next.js Vitest 가이드 정리"
+date: 2026-01-22
+summary: "**Vitest**는 Next.js에서 빠른 실행 속도의 Unit 테스트 러너로, Vite 생태계를 기반으로 React Testing Library와 함께 효과적으로 사용할 수 있습니다."
+tags: ["Next.js", "React", "Frontend", "Vitest", "Testing", "Unit Tests"]
+category: "cs"
+series: "Next.js Guides"
+order: 44
+---
+
+# Next.js Vitest 가이드 정리
+
+## 1. Vitest 개요
+
+**Vitest**는 빠른 실행 속도와 Vite 생태계를 기반으로 한 테스트 러너로, React Testing Library와 함께 단위(Unit) 테스트에 자주 사용됩니다.
+
+문서의 실행 파트에서는 다음과 같이 `npm run test`로 테스트를 돌리는 흐름을 안내합니다.
+
+```bash
+npm run test
+# or
+yarn test
+# or
+pnpm test
+# or
+bun test
+```
+
+---
+
+## 2. 설정 흐름 (공식 가이드의 핵심 구조 요약)
+
+공식 가이드는 보통 아래 순서로 구성됩니다.
+
+1. Vitest(및 테스트 환경용 패키지)를 dev dependency로 설치
+2. `vitest.config.*`에서 테스트 환경(예: jsdom)과 setup 파일을 연결
+3. `package.json`에 `test` 스크립트 추가
+4. React Testing Library 기반의 첫 테스트 작성
+5. `npm run test`로 실행
+
+---
+
+## 3. (예시) Vitest 설정 파일 구성
+
+아래는 Next.js 프로젝트에서 흔히 사용하는 Vitest 설정 예시입니다.  
+※ **예시이며**, 프로젝트/버전/요구사항에 따라 달라질 수 있습니다. (추측입니다)
+
+```ts
+// vitest.config.ts (예시)
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './vitest.setup.ts',
+  },
+})
+```
+
+setup 파일 예시:
+
+```ts
+// vitest.setup.ts (예시)
+import '@testing-library/jest-dom'
+```
+
+---
+
+## 4. (예시) 첫 테스트 작성
+
+```tsx
+// __tests__/page.test.tsx (예시)
+import { render, screen } from '@testing-library/react'
+import Page from '../app/page'
+
+test('renders a heading', () => {
+  render(<Page />)
+  expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+})
+```
+
+---
+
+## 5. Running your tests
+
+`package.json`에 `test` 스크립트를 추가한 뒤 다음으로 실행합니다.
+
+```bash
+npm run test
+# or
+yarn test
+# or
+pnpm test
+# or
+bun test
+```
+
+---
+
+## 6. Additional Resources
+
+문서의 추가 자료 섹션에서는 아래 리소스를 참고하라고 안내합니다.
+
+- Next.js with Vitest example (GitHub)
+- Vitest 공식 문서
+- React Testing Library 문서
+
+---
+
+## 7. 정리
+
+- Vitest는 빠른 실행 속도와 Vite 생태계 통합이 장점입니다.
+- React Testing Library와 함께 사용하면 효과적인 Unit 테스트가 가능합니다.
+- 설정은 `vitest.config.ts`에서 테스트 환경과 setup 파일을 구성하는 것이 핵심입니다.

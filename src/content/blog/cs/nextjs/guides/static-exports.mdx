@@ -1,0 +1,121 @@
+---
+title: "Next.js Static Exports 가이드 정리"
+date: 2026-01-22
+summary: "**Static Export**는 Next.js 앱을 빌드 시점에 HTML/CSS/JS 정적 자산으로 생성하여 정적 호스팅 환경에 배포할 수 있게 합니다. 각 라우트별 HTML 파일을 생성하여 초기 로딩 성능을 개선합니다."
+tags: ["Next.js", "React", "Frontend", "Static Export", "Deployment"]
+category: "cs"
+series: "Next.js Guides"
+order: 39
+---
+
+# Next.js Static Exports 가이드 정리
+
+## 1. Static Export 개요
+
+**Static Export**는 `next build` 시점에 각 라우트를 HTML/CSS/JS 정적 자산으로 생성해서, `out/` 폴더에 결과물을 내보내는 기능입니다.
+
+- 정적 자산만 서빙할 수 있는 어떤 서버/스토리지(정적 호스팅)에도 배포할 수 있습니다.
+- 전통적인 "SPA(단일 HTML)" 형태가 아니라 **라우트별 HTML 파일을 생성**하므로, 초기 로드에 필요 없는 JS 로딩을 줄여 번들 크기/로딩 시간을 개선할 수 있습니다.
+
+---
+
+## 2. Step 1: `next.config.js`에서 `output: 'export'` 설정
+
+Static Export를 켜려면 `next.config.js`에 `output: 'export'`를 추가합니다.
+
+```js
+// next.config.js
+/**
+ * @type {import('next').NextConfig}
+ */
+const nextConfig = {
+  output: 'export',
+
+  // Optional: Change links `/me` -> `/me/` and emit `/me.html` -> `/me/index.html`
+  // trailingSlash: true,
+
+  // Optional: Prevent automatic `/me` -> `/me/`, instead preserve `href`
+  // skipTrailingSlashRedirect: true,
+
+  // Optional: Change the output directory `out` -> `dist`
+  // distDir: 'dist',
+}
+
+module.exports = nextConfig
+```
+
+---
+
+## 3. Step 2: 빌드해서 정적 산출물 생성
+
+```bash
+next build
+```
+
+빌드가 끝나면 **`out/` 폴더**가 생성되고, 앱의 정적 HTML/CSS/JS 자산이 들어갑니다. 이 `out/` 폴더를 그대로 정적 호스팅 환경에 올리면 됩니다.
+
+---
+
+## 4. Supported Features (정적 export에서 가능한 것들)
+
+가이드는 "Next.js 코어는 정적 export를 지원하도록 설계되어 있다"고 설명합니다. 대표적으로:
+
+### 4.1 Server Components
+- `app` 디렉토리의 Server Components는 `next build` 시점(빌드 타임)에 실행됩니다.
+- 결과는 **초기 로드를 위한 정적 HTML** + **클라이언트 라우팅을 위한 정적 payload**로 만들어집니다.
+- 단, Server Component가 **dynamic server functions**(요청 시점 정보에 의존하는 기능)를 사용하면 정적 export에 제약이 생길 수 있습니다.
+
+```ts
+// app/page.tsx
+export default async function Page() {
+  // This fetch will run on the server during `next build`
+  const res = await fetch('https://api.example.com/...')
+  const data = await res.json()
+
+  return <main>...</main>
+}
+```
+
+### 4.2 Client Components
+- 클라이언트에서 데이터 패칭이 필요하다면 Client Component + SWR 같은 라이브러리를 사용해 요청을 메모이즈/캐시하는 패턴을 제시합니다.
+
+### 4.3 Route Handlers (정적 생성 가능한 범위)
+- 정적 export에서도 "빌드 시점에 결과를 만들 수 있는" Route Handler 패턴(예: 정적 파일 생성용)은 활용할 수 있습니다.
+  - 보통 RSS/사이트맵/robots 같은 "정적 결과물"을 생성하는 용도로 씁니다.
+  - (정적 호스팅에는 런타임 API가 없기 때문에, 요청 시점에 실행되는 API 서버처럼 쓰는 건 어렵습니다.)
+
+### 4.4 Browser APIs
+- 클라이언트 사이드에서 사용하는 브라우저 API 자체는 문제 없이 사용할 수 있습니다(클라이언트 컴포넌트에서 실행).
+
+---
+
+## 5. Unsupported Features (정적 export에서 지원되지 않는 것들)
+
+공식 가이드의 **Unsupported Features** 목록(일부):
+
+- Server Actions
+- Intercepting Routes
+- Incremental Static Regeneration (ISR)
+- Image Optimization (기본 loader)
+- Draft Mode
+- Middleware
+- Rewrites
+- Redirects
+- Headers
+
+> 포인트: 서버가 있어야 가능한 기능(요청 시점 처리/동적 헤더/리라이트/ISR 등)은 정적 export에선 사용할 수 없습니다.
+
+---
+
+## 6. Deploying (배포)
+
+- `next build` 결과로 생긴 **`out/` 폴더**를 정적 서버/정적 호스팅(예: Nginx 정적 서빙, S3+CDN 등)에 업로드합니다.
+- 필요하면 `distDir`로 출력 폴더명을 변경할 수 있습니다.
+
+---
+
+## 7. 정리
+
+- `output: 'export'` + `next build`로 정적 파일을 생성한다.
+- "서버가 필요한 기능"은 대부분 제한된다(특히 ISR, Middleware, Draft Mode, 기본 이미지 최적화 등).
+- 가능한 범위 내에서 **빌드 타임 생성** 패턴으로 설계하면 정적 export로도 많은 기능을 구현할 수 있다.

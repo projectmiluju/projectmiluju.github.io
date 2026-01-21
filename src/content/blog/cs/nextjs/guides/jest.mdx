@@ -1,0 +1,178 @@
+---
+title: "Next.js Jest 가이드 정리"
+date: 2026-01-22
+summary: "**Jest**는 Next.js에서 Unit 테스트와 Snapshot 테스트에 주로 사용되며, React Testing Library와 함께 컴포넌트를 효과적으로 테스트할 수 있습니다."
+tags: ["Next.js", "React", "Frontend", "Jest", "Testing", "Unit Tests"]
+category: "cs"
+series: "Next.js Guides"
+order: 42
+---
+
+# Next.js Jest 가이드 정리
+
+## 1. Jest 개요
+
+Jest는 보통 **React Testing Library**와 함께 Unit 테스트 / Snapshot 테스트에 많이 사용됩니다.
+
+> Good to know:
+> - `async` Server Components는 React 생태계에서 비교적 새 기능이라, **Jest가 현재 지원하지 않습니다.**
+> - 동기(Server/Client) 컴포넌트는 테스트할 수 있지만, `async` 컴포넌트는 E2E 테스트를 권장합니다.
+
+---
+
+## 2. Quickstart
+
+```bash
+npx create-next-app@latest --example with-jest with-jest-app
+```
+
+---
+
+## 3. Manual setup
+
+### 3.1 설치
+
+```bash
+npm install -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+# or
+yarn add -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+# or
+pnpm install -D jest jest-environment-jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom ts-node @types/jest
+```
+
+### 3.2 기본 설정 파일 생성
+
+```bash
+npm init jest@latest
+# or
+yarn create jest@latest
+# or
+pnpm create jest@latest
+```
+
+이 과정에서 `jest.config.ts|js`가 생성됩니다.
+
+### 3.3 `next/jest`로 설정 업데이트
+
+```ts
+// jest.config.ts
+import type { Config } from 'jest'
+import nextJest from 'next/jest.js'
+
+const createJestConfig = nextJest({
+  // next.config.js와 .env를 테스트 환경에 로드하기 위한 Next.js 앱 경로
+  dir: './',
+})
+
+// 커스텀 설정
+const config: Config = {
+  coverageProvider: 'v8',
+  testEnvironment: 'jsdom',
+  // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+}
+
+// next/jest가 Next.js config(비동기)을 로드할 수 있도록 createJestConfig로 export
+export default createJestConfig(config)
+```
+
+`next/jest`가 자동으로 해주는 일(문서 요약):
+- Next.js Compiler(SWC) 기반 `transform` 설정
+- 스타일시트/이미지/`next/font` import 자동 mock 처리
+- `.env` 변형들을 `process.env`로 로드
+- `node_modules`, `.next`를 테스트 리졸브/transform 대상에서 제외
+- `next.config.js`를 로드해서 SWC transform 플래그 반영
+
+---
+
+## 4. Optional: 절대경로/alias 처리
+
+프로젝트가 `tsconfig.json` 또는 `jsconfig.json`의 **paths(alias)**를 사용한다면,
+Jest에서도 `moduleNameMapper`로 같은 규칙을 맞춰야 합니다(문서에서 예시를 제공합니다).
+
+---
+
+## 5. Add a test script to `package.json`
+
+```jsonc
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  }
+}
+```
+
+---
+
+## 6. Creating your first test
+
+### 6.1 테스트 대상 컴포넌트 예시
+
+```js
+// app/page.js
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <Link href="/about">About</Link>
+    </div>
+  )
+}
+```
+
+### 6.2 테스트 파일 생성
+
+프로젝트 루트에 `__tests__/` 폴더를 만들고 테스트를 작성합니다.
+
+```jsx
+// __tests__/page.test.jsx
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import Page from '../app/page'
+
+describe('Page', () => {
+  it('renders a heading', () => {
+    render(<Page />)
+
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading).toBeInTheDocument()
+  })
+})
+```
+
+### 6.3 (선택) Snapshot 테스트
+
+```js
+// __tests__/snapshot.js
+import { render } from '@testing-library/react'
+import Page from '../app/page'
+
+it('renders homepage unchanged', () => {
+  const { container } = render(<Page />)
+  expect(container).toMatchSnapshot()
+})
+```
+
+---
+
+## 7. Running your tests
+
+```bash
+npm run test
+# or
+yarn test
+# or
+pnpm test
+```
+
+---
+
+## 8. 정리
+
+- Next.js는 `next/jest`를 통해 Jest 설정을 쉽게 맞출 수 있습니다.
+- `async` Server Component 단위 테스트는 제한이 있으니, 그런 경우 E2E 테스트를 병행하는 전략이 필요합니다.

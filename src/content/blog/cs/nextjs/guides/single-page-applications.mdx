@@ -1,0 +1,243 @@
+---
+title: "Next.js Single Page Applications 가이드 정리"
+date: 2026-01-22
+summary: "**SPA(Single-Page Application)**는 Next.js로 완전히 지원됩니다. 프리페칭 기반 빠른 라우트 전환, 클라이언트 사이드 데이터 패칭, 브라우저 API 사용 등 SPA 경험을 유지하면서 서버 기능을 점진적으로 도입할 수 있습니다."
+tags: ["Next.js", "React", "Frontend", "SPA", "Single Page Application"]
+category: "cs"
+series: "Next.js Guides"
+order: 38
+---
+
+# Next.js Single Page Applications 가이드 정리
+
+## 1. SPA 개요
+
+Next.js는 SPA(Single-Page Application) 구축을 **완전히 지원**합니다.
+
+- 프리페칭 기반의 빠른 라우트 전환
+- 클라이언트 사이드 데이터 패칭
+- 브라우저 API 사용
+- 서드파티 클라이언트 라이브러리(SWR/React Query 등) 통합
+- 정적 라우트 생성, 필요 시 서버 기능(RSC/Server Actions) 점진 도입
+
+가이드는 "strict SPA"를 다음처럼 정의합니다.
+- CSR 기반: `index.html` 같은 단일 HTML로 시작
+- 풀 리로드 없이 브라우저 JS가 라우팅/DOM 업데이트/데이터 패칭을 담당
+
+---
+
+## 2. 왜 Next.js로 SPA를 만들까?
+
+Next.js는 SPA 경험을 유지하면서도, strict SPA의 단점을 줄여줍니다.
+
+- 자동 코드 스플리팅: 불필요한 JS를 덜 내려받아 번들 크기 감소
+- 라우트별 HTML 엔트리 생성 가능(초기 로딩/SEO/UX 유리)
+- `next/link`의 자동 프리페칭으로 SPA 같은 빠른 전환
+- 프로젝트 성장 시 RSC/Server Actions 등을 "필요한 만큼만" 점진적으로 추가 가능
+
+---
+
+## 3. 패턴 1: React `use()` + Context로 "서버에서 먼저 패칭" 시작하기
+
+핵심 아이디어:
+- 서버(예: root layout)에서 데이터를 **빨리 요청만 시작**하고(Promise 생성)
+- 클라이언트 컴포넌트에서 `use()`로 Promise를 unwrap
+- 이렇게 하면 Next.js가 서버에서 일찍 스트리밍을 시작할 수 있고, 클라이언트 워터폴을 줄일 수 있음
+
+### 3.1 Root Layout에서 Promise 만들기(await 하지 않음)
+
+```tsx
+// app/layout.tsx
+import { UserProvider } from './user-provider'
+import { getUser } from './user' // server-side function
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const userPromise = getUser() // do NOT await
+
+  return (
+    <html lang="en">
+      <body>
+        <UserProvider userPromise={userPromise}>{children}</UserProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+### 3.2 Context Provider로 Promise 전달
+
+```tsx
+// app/user-provider.tsx
+'use client'
+
+import { createContext, useContext, ReactNode } from 'react'
+
+type User = any
+type UserContextType = { userPromise: Promise<User | null> }
+
+const UserContext = createContext<UserContextType | null>(null)
+
+export function useUser(): UserContextType {
+  const ctx = useContext(UserContext)
+  if (!ctx) throw new Error('useUser must be used within a UserProvider')
+  return ctx
+}
+
+export function UserProvider({
+  children,
+  userPromise,
+}: {
+  children: ReactNode
+  userPromise: Promise<User | null>
+}) {
+  return (
+    <UserProvider userPromise={userPromise}>{children}</UserProvider>
+  )
+}
+```
+
+### 3.3 Client Component에서 `use()`로 Promise unwrap
+
+```tsx
+// app/profile.tsx
+'use client'
+
+import { use } from 'react'
+import { useUser } from './user-provider'
+
+export function Profile() {
+  const { userPromise } = useUser()
+  const user = use(userPromise)
+
+  return <div>...</div>
+}
+```
+
+---
+
+## 4. 패턴 2: SWR로 SPA 데이터 패칭 유지 + 서버 데이터 결합
+
+SWR 2.3.0(React 19+)에서는 `use()` 패턴을 추상화해,
+기존 클라이언트 패칭 코드를 유지하면서 서버 측 데이터 제공(RSC)과 결합할 수 있습니다.
+
+- Client-only: `useSWR(key, fetcher)`
+- Server-only: `useSWR(key)` + RSC 제공 데이터
+- Mixed: `useSWR(key, fetcher)` + RSC 제공 데이터
+
+가이드는 이를 위해 `<SWRConfig>`의 `fallback`을 활용하는 접근을 안내합니다.
+
+---
+
+## 5. 브라우저에서만 렌더링해야 하는 컴포넌트
+
+`window`, `document` 같은 브라우저 API에 의존하는 라이브러리는
+서버 렌더링에서 문제가 될 수 있습니다.
+
+가이드는 다음 같은 접근을 언급합니다.
+- 브라우저 API 존재 여부를 체크하는 `useEffect`를 두고,
+  없으면 `null` 또는 로딩 상태를 반환(이 반환값은 프리렌더링 가능)
+
+---
+
+## 6. Shallow routing (클라이언트에서 URL만 갱신)
+
+Create React App/Vite 같은 strict SPA에서 넘어오면, URL 상태만 바꾸는 shallow routing 코드가 있을 수 있습니다.
+
+Next.js는 `window.history.pushState/replaceState`를 통해
+풀 리로드 없이 URL을 갱신하면서도, Router와 동기화(`usePathname`, `useSearchParams`)할 수 있습니다.
+
+```tsx
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+
+export default function SortProducts() {
+  const searchParams = useSearchParams()
+
+  function updateSorting(sortOrder: string) {
+    const urlSearchParams = new URLSearchParams(searchParams.toString())
+    urlSearchParams.set('sort', sortOrder)
+    window.history.pushState(null, '', `?${urlSearchParams.toString()}`)
+  }
+
+  return (
+    <>
+      <button onClick={() => updateSorting('asc')}>Sort Ascending</button>
+      <button onClick={() => updateSorting('desc')}>Sort Descending</button>
+    </>
+  )
+}
+```
+
+---
+
+## 7. Client Components에서 Server Actions 점진 도입
+
+API Route를 따로 만들지 않고, 클라이언트에서 "함수 호출"처럼 서버 로직을 호출할 수 있습니다.
+
+```ts
+// app/actions.ts
+'use server'
+
+export async function create() {}
+```
+
+```tsx
+// app/button.tsx
+'use client'
+
+import { create } from './actions'
+
+export function Button() {
+  return <button onClick={() => create()}>Create</button>
+}
+```
+
+---
+
+## 8. Static export (선택)
+
+Next.js는 완전 정적 사이트 생성도 지원합니다.
+
+strict SPA 대비 장점(가이드에서 강조):
+- 라우트별 HTML 생성 → 초기 표시 빠름
+- 각 라우트가 "완성된 HTML"로 시작 → UX 개선
+- 클라이언트 이동은 여전히 SPA처럼 빠름
+
+설정:
+
+```ts
+// next.config.ts
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  output: 'export',
+}
+
+export default nextConfig
+```
+
+`next build` 후 `out/` 폴더가 생성됩니다.
+
+> 주의: static export에서는 Next.js 서버 기능이 지원되지 않습니다.
+
+---
+
+## 9. 마이그레이션 가이드
+
+기존 strict SPA는 큰 변경 없이 Next.js로 옮긴 뒤,
+필요한 만큼 서버 기능을 점진적으로 도입할 수 있습니다.
+
+- Create React App → Next.js 마이그레이션 가이드
+- Vite → Next.js 마이그레이션 가이드
+- Pages Router 기반 SPA라면 App Router를 점진 도입하는 가이드도 참고 가능
+
+---
+
+## 10. 정리
+
+- Next.js는 "SPA 같은 UX"를 유지하면서도,
+  코드 스플리팅/라우트별 HTML/서버 기능 점진 도입으로 성능·확장성을 확보할 수 있습니다.
+- 데이터 패칭은 root layout에서 "먼저 시작"하고, client에서 `use()`로 소비하는 패턴이 핵심입니다.
+- SWR/React Query 등 기존 클라이언트 라이브러리도 함께 사용할 수 있습니다.
+- static export는 "서버 기능이 필요 없는" 순수 정적 배포에만 적합합니다.

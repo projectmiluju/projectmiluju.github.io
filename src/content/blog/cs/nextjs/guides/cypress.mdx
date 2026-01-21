@@ -1,0 +1,184 @@
+---
+title: "Next.js Cypress 가이드 정리"
+date: 2026-01-22
+summary: "**Cypress**는 Next.js에서 E2E 테스트와 Component Testing에 사용할 수 있는 테스트 러너입니다. 실제 브라우저에서 앱을 탐색하는 것처럼 테스트할 수 있습니다."
+tags: ["Next.js", "React", "Frontend", "Cypress", "Testing", "E2E"]
+category: "cs"
+series: "Next.js Guides"
+order: 41
+---
+
+# Next.js Cypress 가이드 정리
+
+## 1. Cypress 개요
+
+**Cypress**는 End-to-End(E2E) 테스트와 Component Testing에 자주 쓰이는 테스트 러너입니다.
+
+> Warning:
+> - Cypress 13.6.3 미만은 TypeScript 5의 `moduleResolution: "bundler"`를 지원하지 않습니다. 이 문제는 **Cypress 13.6.3+**에서 해결되었습니다.
+
+---
+
+## 2. Quickstart
+
+가장 빠른 시작 방법은 `create-next-app`에서 제공하는 예제를 쓰는 것입니다.
+
+```bash
+npx create-next-app@latest --example with-cypress with-cypress-app
+```
+
+---
+
+## 3. Manual setup
+
+### 3.1 Cypress 설치
+
+```bash
+npm install -D cypress
+# or
+yarn add -D cypress
+# or
+pnpm install -D cypress
+```
+
+### 3.2 `package.json` 스크립트 추가
+
+```jsonc
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "cypress:open": "cypress open"
+  }
+}
+```
+
+### 3.3 Cypress 최초 실행
+
+```bash
+npm run cypress:open
+```
+
+- E2E / Component Testing 중 선택할 수 있으며,
+- 선택 시 `cypress.config.js`(또는 ts)와 `cypress/` 폴더가 생성됩니다.
+
+---
+
+## 4. Creating your first Cypress E2E test
+
+### 4.1 `cypress.config` 기본 형태
+
+```ts
+// cypress.config.ts
+import { defineConfig } from 'cypress'
+
+export default defineConfig({
+  e2e: {
+    setupNodeEvents(on, config) {},
+  },
+})
+```
+
+### 4.2 테스트용 페이지 2개 만들기
+
+```js
+// app/page.js
+import Link from 'next/link'
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <Link href="/about">About</Link>
+    </div>
+  )
+}
+```
+
+```js
+// app/about/page.js
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>About</h1>
+      <Link href="/">Home</Link>
+    </div>
+  )
+}
+```
+
+### 4.3 E2E 테스트 작성
+
+```js
+// cypress/e2e/app.cy.js
+describe('Navigation', () => {
+  it('should navigate to the about page', () => {
+    // Start from the index page
+    cy.visit('http://localhost:3000/')
+
+    // Find a link with an href attribute containing "about" and click it
+    cy.get('a[href*="about"]').click()
+
+    // The new url should include "/about"
+    cy.url().should('include', '/about')
+
+    // The new page should contain an h1 with "About"
+    cy.get('h1').contains('About')
+  })
+})
+```
+
+---
+
+## 5. Running E2E Tests
+
+- Cypress는 실제 사용자가 앱을 탐색하는 것처럼 동작하므로 **Next.js 서버가 실행 중**이어야 합니다.
+- 문서에서는 실제 동작과 더 비슷하게 하려면 **production code 기준으로 테스트**하는 것을 권장합니다.
+
+```bash
+npm run build && npm run start
+# 다른 터미널에서
+npm run cypress:open
+```
+
+> Good to know:
+> - `cypress.config`에 `baseUrl: 'http://localhost:3000'`를 넣으면,
+>   `cy.visit('http://localhost:3000/')` 대신 `cy.visit('/')`로 작성할 수 있습니다.
+
+---
+
+## 6. Component Testing 주의사항
+
+문서 기준:
+- **App Router를 사용하는 Next.js 앱에서는 Cypress Component Testing이 현재 지원되지 않습니다.**
+
+(필요하면 E2E로 대체하거나, 컴포넌트 단위 테스트는 Jest/Vitest 같은 러너를 고려하는 흐름이 자연스럽습니다.)
+
+---
+
+## 7. Continuous Integration (CI)
+
+CI에서는 interactive UI 대신 headless 실행(`cypress run`)을 권장합니다. 예시:
+
+```jsonc
+{
+  "scripts": {
+    // ...
+    "e2e": "start-server-and-test dev http://localhost:3000 "cypress open --e2e"",
+    "e2e:headless": "start-server-and-test dev http://localhost:3000 "cypress run --e2e"",
+    "component": "cypress open --component",
+    "component:headless": "cypress run --component"
+  }
+}
+```
+
+---
+
+## 8. 정리
+
+- `with-cypress` 예제로 가장 빠르게 시작할 수 있습니다.
+- E2E는 `build && start` 후 실행(운영 환경과 유사하게)하는 것을 권장합니다.
+- App Router 환경에서는 Cypress Component Testing이 제한이 있으므로, 필요 시 다른 테스트 도구(단위 테스트 러너)와 역할 분리를 고려하세요.

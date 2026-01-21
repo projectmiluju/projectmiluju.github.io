@@ -1,0 +1,206 @@
+---
+title: "Next.js Self-Hosting 가이드 정리"
+date: 2026-01-22
+summary: "**Self-Hosting**은 Next.js를 Vercel이 아닌 자체 인프라에 배포하는 방법을 안내합니다. Reverse Proxy, Image Optimization, Environment Variables 등 기능별 고려사항을 다룹니다."
+tags: ["Next.js", "React", "Frontend", "Self-Hosting", "Deployment", "Infrastructure"]
+category: "cs"
+series: "Next.js Guides"
+order: 37
+---
+
+# Next.js Self-Hosting 가이드 정리
+
+## 1. Self-Hosting 개요
+
+Next.js를 Vercel이 아닌 **자체 인프라(서버/VM/컨테이너 등)에 배포**할 때, 기능별로 어떤 설정이 필요한지 정리한 가이드입니다.
+
+- Reverse Proxy(예: nginx) 권장
+- `next/image`, Proxy, 캐싱/ISR, 환경 변수(빌드타임/런타임), 스트리밍(Suspense) 등 기능별 고려사항 존재
+
+---
+
+## 2. Reverse Proxy 권장
+
+Next.js 서버를 인터넷에 직접 노출하기보다, **nginx 같은 Reverse Proxy 뒤에 두는 것을 권장**합니다.
+
+Reverse Proxy가 해줄 수 있는 것:
+- 비정상 요청 처리 / 느린 연결 공격 방어
+- payload size 제한
+- rate limiting 등 보안/보호 기능
+- Next.js 서버는 "렌더링"에 더 집중 가능
+
+---
+
+## 3. Image Optimization (next/image)
+
+- `next start`로 self-hosting하면, `next/image` 최적화는 **추가 설정 없이 동작**
+- 별도 이미지 최적화 서비스를 쓰고 싶으면 **custom image loader**를 설정
+- **static export**에서도 custom loader를 통해 `next/image` 사용 가능
+  - 단, 최적화는 빌드 시점이 아니라 **런타임**에 수행
+
+추가 참고 사항(가이드에 언급된 핵심):
+- Linux(glibc) 환경에서 `sharp` 관련 추가 설정이 필요할 수 있음(메모리 이슈 방지 목적)
+- 최적화된 이미지의 캐시 TTL은 설정 가능
+- 최적화를 끄고(`unoptimized`)도 `next/image`의 다른 이점은 유지 가능
+
+---
+
+## 4. Proxy
+
+- `next start` 기반 self-hosting에서는 Proxy 기능이 **추가 설정 없이 동작**
+- 다만 Proxy는 **들어오는 요청 접근이 필요**하므로 **static export에서는 지원되지 않음**
+- Proxy는 기본적으로 Edge runtime을 사용(지연 최소화를 위해)
+  - 모든 Node.js API가 필요하면 full Node runtime 사용 또는 대안(서버 컴포넌트/next.config headers/redirects/rewrites/custom server) 고려
+
+---
+
+## 5. Environment Variables (빌드타임 vs 런타임)
+
+### 5.1 기본 규칙
+- 기본적으로 env는 **서버에서만 접근 가능**
+- 브라우저에 노출하려면 `NEXT_PUBLIC_` 접두사 필요
+  - 단, `NEXT_PUBLIC_` env는 `next build` 시 JS 번들에 **인라인**됨(= 빌드 결과에 고정)
+
+### 5.2 런타임 env 읽기 (동적 렌더링에서 안전하게)
+서버에서 동적 렌더링을 선택하면, env를 런타임에 평가할 수 있습니다.
+
+```ts
+// app/page.ts
+import { connection } from 'next/server'
+
+export default async function Component() {
+  await connection()
+  // cookies/headers 등의 Dynamic API를 쓰면 동적 렌더링으로 전환되어
+  // env가 런타임에 평가됩니다.
+  const value = process.env.MY_VALUE
+  // ...
+}
+```
+
+이 방식은 **단일 Docker 이미지**를 만들어 여러 환경(dev/stage/prod)에 배포하고,
+환경별로 다른 env 값을 주입하는 운영에 유리하다고 설명합니다.
+
+> Good to know: 서버 시작 시점에 실행할 코드는 `register` 함수로 구성 가능
+
+---
+
+## 6. Caching and ISR (캐시/재검증)
+
+### 6.1 캐시의 기본
+Next.js는 다음을 캐시할 수 있습니다.
+- 응답
+- 생성된 정적 페이지
+- 빌드 산출물
+- 이미지/폰트/스크립트 같은 정적 자산
+
+ISR(재검증)과 일반 캐싱은 **같은 shared cache**를 사용합니다.  
+기본 저장소는 self-hosted 서버의 **파일 시스템(디스크)** 입니다.
+
+> 여러 컨테이너/인스턴스에서 캐시를 공유하려면 캐시 저장 위치/핸들러를 조정해야 함
+
+### 6.2 Automatic Caching 헤더 규칙(핵심 정리)
+- **Immutable 자산**: `public, max-age=31536000, immutable` (오버라이드 불가)
+  - 파일명에 SHA 해시 포함 → 무기한 캐시 안전
+- **ISR**: `s-maxage: <revalidate>, stale-while-revalidate`
+  - `revalidate: false`면 1년 캐시로 기본 설정
+- **동적 렌더링 페이지**: `private, no-cache, no-store, max-age=0, must-revalidate`
+  - 사용자별 데이터 캐싱 방지
+  - Draft Mode도 여기에 포함
+
+### 6.3 Static Assets 분리 (assetPrefix)
+정적 자산을 다른 도메인/CDN으로 분리하려면 `assetPrefix`를 사용합니다.
+- 장점: 정적 파일을 CDN으로 서빙 가능
+- 단점: DNS/TLS 추가 비용(초기 연결 시간 증가)
+
+### 6.4 Kubernetes 등에서 캐시 일관성 유지 (custom cache handler)
+Kubernetes처럼 여러 pod가 뜨면 각 pod가 캐시를 따로 가지게 됩니다.  
+기본적으로 캐시가 공유되지 않으면 stale 데이터가 보일 수 있으므로, **cache handler를 커스텀**하고 in-memory 캐시를 끄는 구성을 제안합니다.
+
+```js
+// next.config.js
+module.exports = {
+  cacheHandler: require.resolve('./cache-handler.js'),
+  cacheMaxMemorySize: 0, // disable default in-memory caching
+}
+```
+
+```js
+// cache-handler.js (예시: 메모리에 저장. 실제로는 Redis/S3 등 내구 스토리지 가능)
+const cache = new Map()
+
+module.exports = class CacheHandler {
+  constructor(options) {
+    this.options = options
+  }
+
+  async get(key) {
+    return cache.get(key)
+  }
+
+  async set(key, data, ctx) {
+    cache.set(key, {
+      value: data,
+      lastModified: Date.now(),
+      tags: ctx.tags,
+    })
+  }
+
+  async revalidateTag(tags) {
+    tags = [tags].flat()
+    for (let [key, value] of cache) {
+      if (value.tags.some((tag) => tags.includes(tag))) {
+        cache.delete(key)
+      }
+    }
+  }
+
+  resetRequestCache() {}
+}
+```
+
+---
+
+## 7. Build Cache / Version Skew
+
+- **Build Cache**: 빌드 중 생성되는 캐시 산출물(`.next/cache`)을 공유하면 CI 빌드 시간을 줄일 수 있음
+  - 단, 서로 다른 CI 작업에서 같은 빌드 캐시를 공유할 때 주의점이 존재(가이드에서 "주의" 언급)
+- **Version Skew**: 서버/클라이언트가 다른 버전을 서빙하는 상태(예: CDN 캐시)에서 문제가 생길 수 있어 주의 필요
+
+---
+
+## 8. Streaming and Suspense (Reverse Proxy 설정 중요)
+
+Streaming을 쓰면 프록시가 응답을 버퍼링하지 않도록 설정해야 할 수 있습니다.  
+nginx 예시:
+
+```nginx
+location / {
+  proxy_http_version 1.1;
+  proxy_pass http://nextjs_upstream;
+  proxy_buffering off;
+  proxy_set_header Host $host;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+}
+```
+
+---
+
+## 9. Cache Components / CDN과 함께 쓰기
+
+- Cache Components는 self-hosting에서도 사용 가능하지만,
+  인프라(컨테이너/서버리스/엣지/런타임) 구성에 따라 캐시 전략을 맞춰야 합니다.
+- CDN은 정적 자산 캐싱에 유용하지만,
+  동적/개인화 콘텐츠와 섞일 때 캐시 키/헤더 전략을 명확히 해야 합니다.
+
+---
+
+## 10. 정리
+
+Self-hosting에서 가장 중요한 체크 포인트는 다음입니다.
+
+- Reverse Proxy를 앞단에 두고 보안/성능을 분리한다.
+- `next/image`, Proxy는 `next start` 환경에서 무리 없이 동작하지만, static export에는 제한이 있다.
+- env는 `NEXT_PUBLIC_`의 "빌드 시점 고정" 특성을 이해하고, 런타임 env가 필요하면 동적 렌더링 방식으로 읽는다.
+- ISR/캐싱은 기본적으로 디스크 기반이며, 다중 인스턴스에서는 cache handler를 통해 공유/일관성을 설계한다.
+- Streaming은 프록시 버퍼링 설정을 반드시 점검한다.

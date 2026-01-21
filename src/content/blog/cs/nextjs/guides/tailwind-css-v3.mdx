@@ -1,0 +1,112 @@
+---
+title: "Next.js Tailwind CSS v3 가이드 정리"
+date: 2026-01-22
+summary: "**Tailwind CSS v3**는 Next.js(App Router) 프로젝트에 쉽게 통합할 수 있습니다. 유틸리티 클래스를 통해 빠르고 일관된 스타일링이 가능하며, Turbopack에서도 지원됩니다."
+tags: ["Next.js", "React", "Frontend", "Tailwind CSS", "CSS", "Styling"]
+category: "cs"
+series: "Next.js Guides"
+order: 40
+---
+
+# Next.js Tailwind CSS v3 가이드 정리
+
+## 1. 개요
+
+이 가이드는 Next.js(App Router) 프로젝트에 **Tailwind CSS v3**를 설치/설정하는 과정을 안내합니다.
+
+> 참고: 문서에서는 Tailwind v4가 "최신"이며, v4 설치는 별도 안내 링크를 참고하라고 안내합니다.
+
+---
+
+## 2. Step 1: Tailwind v3 설치
+
+Tailwind CSS(v3)와 peer dependencies(PostCSS, Autoprefixer)를 설치한 뒤, `init`으로 설정 파일을 생성합니다.
+
+```bash
+pnpm add -D tailwindcss@^3 postcss autoprefixer
+npx tailwindcss init -p
+```
+
+- `tailwind.config.js`
+- `postcss.config.js`
+가 생성됩니다.
+
+---
+
+## 3. Step 2: `tailwind.config.js`에서 content 경로 설정
+
+Tailwind가 클래스 사용을 스캔할 경로를 `content`에 설정합니다.
+
+```js
+// tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+---
+
+## 4. Step 3: 전역 CSS에 Tailwind 지시어 추가
+
+`app/globals.css`에 아래 3줄을 추가합니다.
+
+```css
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+---
+
+## 5. Step 4: Root Layout에서 전역 CSS import
+
+Root Layout에서 `globals.css`를 import합니다.
+
+```tsx
+// app/layout.tsx
+import './globals.css'
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+---
+
+## 6. Step 5: Tailwind 클래스 사용
+
+설정이 끝나면 컴포넌트에서 유틸리티 클래스를 바로 사용할 수 있습니다.
+
+```tsx
+// app/page.tsx
+export default function Page() {
+  return <h1 className="text-3xl font-bold underline">Hello, Next.js!</h1>
+}
+```
+
+---
+
+## 7. Usage with Turbopack
+
+문서 기준으로 **Next.js 13.1부터 Turbopack에서 Tailwind CSS + PostCSS를 지원**한다고 안내합니다.
+
+---
+
+## 8. 정리
+
+- 설치 → content 경로 설정 → globals.css 지시어 → layout import 순서로 진행한다.
+- Tailwind v3는 위 방식으로 연결하고, Tailwind v4는 별도 최신 가이드를 따른다.

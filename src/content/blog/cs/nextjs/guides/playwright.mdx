@@ -1,0 +1,133 @@
+---
+title: "Next.js Playwright 가이드 정리"
+date: 2026-01-22
+summary: "**Playwright**는 Next.js에서 E2E 테스트에 사용할 수 있는 강력한 테스트 프레임워크입니다. 단일 API로 Chromium, Firefox, WebKit을 자동화할 수 있습니다."
+tags: ["Next.js", "React", "Frontend", "Playwright", "Testing", "E2E"]
+category: "cs"
+series: "Next.js Guides"
+order: 43
+---
+
+# Next.js Playwright 가이드 정리
+
+## 1. Playwright 개요
+
+**Playwright**는 단일 API로 Chromium/Firefox/WebKit을 자동화할 수 있는 E2E 테스트 프레임워크입니다. 이 가이드는 Next.js에서 Playwright를 설정하고 첫 E2E 테스트를 만드는 흐름을 소개합니다.
+
+---
+
+## 2. Quickstart
+
+```bash
+npx create-next-app@latest --example with-playwright with-playwright-app
+```
+
+---
+
+## 3. Manual setup
+
+Playwright 설치(초기 설정 포함):
+
+```bash
+npm init playwright
+# or
+yarn create playwright
+# or
+pnpm create playwright
+```
+
+- 프롬프트를 따라가면 `playwright.config.ts` 등이 생성됩니다.
+
+---
+
+## 4. Creating your first Playwright E2E test
+
+### 4.1 테스트용 페이지 2개 만들기
+
+```tsx
+// app/page.tsx
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <Link href="/about">About</Link>
+    </div>
+  )
+}
+```
+
+```tsx
+// app/about/page.tsx
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div>
+      <h1>About</h1>
+      <Link href="/">Home</Link>
+    </div>
+  )
+}
+```
+
+### 4.2 E2E 테스트 작성
+
+```ts
+// tests/example.spec.ts
+import { test, expect } from '@playwright/test'
+
+test('should navigate to the about page', async ({ page }) => {
+  // Start from the index page (the baseURL is set via the webServer in the playwright.config.ts)
+  await page.goto('http://localhost:3000/')
+
+  // Find an element with the text 'About' and click on it
+  await page.click('text=About')
+
+  // The new URL should be "/about"
+  await expect(page).toHaveURL('http://localhost:3000/about')
+
+  // The new page should contain an h1 with "About"
+  await expect(page.locator('h1')).toContainText('About')
+})
+```
+
+> Good to know:
+> - `playwright.config.ts`에 `baseURL: "http://localhost:3000"`을 설정하면
+>   `page.goto('http://localhost:3000/')` 대신 `page.goto('/')`로 작성할 수 있습니다.
+
+---
+
+## 5. Running your Playwright tests
+
+Playwright는 브라우저에서 앱을 실제로 탐색하므로 **Next.js 서버가 실행 중**이어야 합니다. 문서는 운영과 유사하게 **production code 기준 테스트**를 권장합니다.
+
+```bash
+npm run build
+npm run start
+# 다른 터미널에서
+npx playwright test
+```
+
+> Good to know:
+> - 대안으로 Playwright의 `webServer` 기능을 사용하면 Playwright가 개발 서버를 직접 띄우고 준비될 때까지 기다리게 할 수 있습니다.
+
+---
+
+## 6. Running Playwright on CI
+
+- Playwright는 기본적으로 **headless**로 실행됩니다.
+- CI 환경에서 의존성 설치를 위해 다음을 실행할 수 있습니다:
+
+```bash
+npx playwright install-deps
+```
+
+---
+
+## 7. 정리
+
+- `with-playwright` 예제로 빠르게 시작 가능.
+- 테스트 실행은 `build && start` 후 `npx playwright test`로 분리 실행하는 것을 권장.
+- CI에서는 headless 기본 실행 + `install-deps`로 의존성 준비.
