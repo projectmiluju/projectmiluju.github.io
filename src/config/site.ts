@@ -84,6 +84,13 @@ export const siteConfig = {
       folder: 'cs/nextjs/guides',
       icon: '📖'
     },
+    {
+      slug: 'Today I Learned',
+      name: 'Today I Learned',
+      category: 'til',
+      folder: 'til/til',
+      icon: '📚'
+    }
   ],
 };
 
