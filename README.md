@@ -59,7 +59,7 @@ title: "포스트 제목"
 date: 2024-01-01
 summary: "포스트 요약 (목록에 표시됨)"
 tags: ["Tag1", "Tag2"]
-category: "cs"          # cs | book | troubleshooting
+category: "cs"          # cs | book | til
 series: "시리즈명"       # 선택 사항
 cover: "/images/blog/cover.png"  # 선택 사항
 draft: false            # true면 목록에서 숨김
@@ -71,7 +71,7 @@ draft: false            # true면 목록에서 숨김
 #### 카테고리
 - `cs`: CS 개념 정리
 - `book`: 개발 서적 리뷰
-- `troubleshooting`: 문제 해결 기록
+- `til`: 문제 해결 기록
 
 ### 프로젝트 작성
 

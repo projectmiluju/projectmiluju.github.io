@@ -38,7 +38,7 @@ export const siteConfig = {
   blogCategories: [
     { slug: 'cs', name: 'CS Notes', description: 'Computer Science 핵심 개념 정리' },
     { slug: 'book', name: 'Book Notes', description: '개발 서적 정리 및 리뷰' },
-    { slug: 'troubleshooting', name: 'Troubleshooting', description: '실무 문제 해결 기록' },
+    { slug: 'til', name: 'TIL', description: 'Today I Learned' },
   ],
   // 블로그 시리즈 (세부 분류)
   blogSeries: [

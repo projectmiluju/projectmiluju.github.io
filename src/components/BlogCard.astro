@@ -13,7 +13,7 @@ const { title, slug, date, summary, category, tags = [] } = Astro.props;
 const categoryLabels: Record<string, string> = {
   cs: 'CS Notes',
   book: 'Book Notes',
-  troubleshooting: 'Troubleshooting',
+  til: 'TIL',
 };
 
 const formattedDate = date.toLocaleDateString('ko-KR', {
@@ -112,7 +112,7 @@ const formattedDate = date.toLocaleDateString('ko-KR', {
     color: #b45309;
   }
 
-  .category-badge[data-category="troubleshooting"] {
+  .category-badge[data-category="til"] {
     background-color: #fee2e2;
     color: #dc2626;
   }
@@ -128,7 +128,7 @@ const formattedDate = date.toLocaleDateString('ko-KR', {
       color: #fcd34d;
     }
 
-    :root:not([data-theme="light"]) .category-badge[data-category="troubleshooting"] {
+    :root:not([data-theme="light"]) .category-badge[data-category="til"] {
       background-color: #7f1d1d;
       color: #fca5a5;
     }
@@ -144,7 +144,7 @@ const formattedDate = date.toLocaleDateString('ko-KR', {
     color: #fcd34d;
   }
 
-  [data-theme="dark"] .category-badge[data-category="troubleshooting"] {
+  [data-theme="dark"] .category-badge[data-category="til"] {
     background-color: #7f1d1d;
     color: #fca5a5;
   }

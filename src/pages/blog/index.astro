@@ -34,20 +34,20 @@ const postsBySeries = allPosts.reduce((acc, post) => {
 const categoryLabels: Record<string, string> = {
   cs: 'CS Notes',
   book: 'Book Notes',
-  troubleshooting: 'Troubleshooting',
+  til: 'TIL',
 };
 ---
 
 <BaseLayout 
   title="블로그"
-  description="CS 개념 정리, 개발 서적 리뷰, 트러블슈팅 경험을 기록합니다."
+  description="CS 개념 정리, 개발 서적 리뷰, TIL 경험을 기록합니다."
 >
   <section class="section">
     <div class="container">
       <header class="page-header">
         <h1 class="page-title">블로그</h1>
         <p class="page-desc">
-          CS 개념 정리, 개발 서적 리뷰, 트러블슈팅 경험을 기록합니다.
+          CS 개념 정리, 개발 서적 리뷰, TIL 경험을 기록합니다.
         </p>
       </header>
 
@@ -801,7 +801,7 @@ const categoryLabels: Record<string, string> = {
     color: #b45309;
   }
 
-  .card-category[data-category="troubleshooting"] {
+  .card-category[data-category="til"] {
     background-color: #fee2e2;
     color: #dc2626;
   }
@@ -817,7 +817,7 @@ const categoryLabels: Record<string, string> = {
       color: #fcd34d;
     }
 
-    .card-category[data-category="troubleshooting"] {
+    .card-category[data-category="til"] {
       background-color: #7f1d1d;
       color: #fca5a5;
     }

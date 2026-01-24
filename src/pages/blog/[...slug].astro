@@ -24,7 +24,7 @@ const { title, date, summary, tags, category, series } = post.data;
 const categoryLabels: Record<string, string> = {
   cs: 'CS Notes',
   book: 'Book Notes',
-  troubleshooting: 'Troubleshooting',
+  til: 'TIL',
 };
 
 const formattedDate = date.toLocaleDateString('ko-KR', {
@@ -218,7 +218,7 @@ const relatedPosts = allPosts
     color: #b45309;
   }
 
-  .category-badge[data-category="troubleshooting"] {
+  .category-badge[data-category="til"] {
     background-color: #fee2e2;
     color: #dc2626;
   }
@@ -234,7 +234,7 @@ const relatedPosts = allPosts
       color: #fcd34d;
     }
 
-    .category-badge[data-category="troubleshooting"] {
+    .category-badge[data-category="til"] {
       background-color: #7f1d1d;
       color: #fca5a5;
     }
@@ -429,7 +429,7 @@ const relatedPosts = allPosts
     color: #b45309;
   }
 
-  .related-category[data-category="troubleshooting"] {
+  .related-category[data-category="til"] {
     background-color: #fee2e2;
     color: #dc2626;
   }
@@ -445,7 +445,7 @@ const relatedPosts = allPosts
       color: #fcd34d;
     }
 
-    .related-category[data-category="troubleshooting"] {
+    .related-category[data-category="til"] {
       background-color: #7f1d1d;
       color: #fca5a5;
     }
