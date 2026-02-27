@@ -8,35 +8,48 @@ interface Props {
 
 const { title, description, icon, evidence } = Astro.props;
 
-const icons = {
-  shield: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-  zap: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
-  cog: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+const iconMap = {
+  shield: '[RELIABILITY]',
+  zap: '[PERFORMANCE]',
+  cog: '[AUTOMATION]',
 };
+
+const statusLabel = iconMap[icon] || `[${icon.toUpperCase()}]`;
 ---
 
-<div class="strength-card card-3d">
-  <div class="card-inner">
-    <div class="icon-wrapper" set:html={icons[icon]} />
-    <h3 class="strength-title">{title}</h3>
+<div class="strength-card">
+  <div class="card-header">
+    <span class="status-label">{statusLabel}</span>
+    <span class="status-pass">PASS</span>
+  </div>
+
+  <div class="card-body">
+    <h3 class="strength-title">
+      <span class="check-mark">✓</span>
+      {title}
+    </h3>
     <p class="strength-desc">{description}</p>
+
     {evidence && (
-      <p class="strength-evidence">{evidence}</p>
+      <div class="evidence-block">
+        <span class="evidence-prefix">↳ </span>
+        <span class="evidence-text">{evidence}</span>
+      </div>
     )}
   </div>
-  <div class="card-glow" aria-hidden="true"></div>
+
+  <div class="card-footer">
+    <span class="footer-dots">···</span>
+  </div>
 </div>
 
 <style>
   .strength-card {
-    position: relative;
-    padding: var(--space-8) var(--space-6);
     background-color: var(--color-bg-alt);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    text-align: center;
-    box-shadow: var(--shadow-card);
-    transition: border-color var(--transition-base), box-shadow var(--transition-base);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-mono);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
     overflow: hidden;
   }
 
@@ -45,52 +58,50 @@ const icons = {
     box-shadow: var(--shadow-card-hover);
   }
 
-  .card-inner {
-    position: relative;
-    z-index: 1;
-  }
-
-  .card-glow {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100px;
-    height: 100px;
-    background: radial-gradient(circle, var(--color-accent-glow) 0%, transparent 70%);
-    opacity: 0;
-    transition: opacity var(--transition-base);
-    pointer-events: none;
-  }
-
-  .strength-card:hover .card-glow {
-    opacity: 1;
-  }
-
-  .icon-wrapper {
-    display: inline-flex;
+  .card-header {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    background-color: var(--color-accent-light);
-    color: var(--color-accent);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--space-5);
-    transition: transform var(--transition-base), background-color var(--transition-base);
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
   }
 
-  .strength-card:hover .icon-wrapper {
-    transform: scale(1.05);
-    background-color: var(--color-accent);
-    color: white;
+  .status-label {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .strength-card:hover .status-label {
+    color: var(--color-accent);
+  }
+
+  .status-pass {
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  .card-body {
+    padding: var(--space-5) var(--space-4);
   }
 
   .strength-title {
-    font-size: var(--text-xl);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-base);
     font-weight: 600;
+    color: var(--color-text-bright);
     margin-bottom: var(--space-3);
-    color: var(--color-text);
+  }
+
+  .check-mark {
+    color: var(--color-accent);
+    font-size: var(--text-lg);
+    flex-shrink: 0;
   }
 
   .strength-desc {
@@ -98,31 +109,45 @@ const icons = {
     color: var(--color-text-muted);
     line-height: 1.7;
     margin: 0;
+    padding-left: calc(var(--space-2) + 1em);
   }
 
-  .strength-evidence {
-    font-size: var(--text-xs);
+  .evidence-block {
+    display: flex;
+    gap: 0;
+    margin-top: var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--color-accent-light);
+    border-left: 2px solid var(--color-accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  .evidence-prefix {
     color: var(--color-accent);
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--color-border);
-    font-style: italic;
+    font-size: var(--text-xs);
+    flex-shrink: 0;
   }
 
-  /* Mobile adjustments */
+  .evidence-text {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
+  .card-footer {
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .footer-dots {
+    font-size: var(--text-xs);
+    color: var(--color-text-dim);
+    letter-spacing: 0.2em;
+  }
+
   @media (max-width: 768px) {
-    .strength-card {
-      padding: var(--space-6);
-      border-radius: var(--radius-lg);
-    }
-
-    .icon-wrapper {
-      width: 48px;
-      height: 48px;
-    }
-
-    .strength-title {
-      font-size: var(--text-lg);
+    .card-body {
+      padding: var(--space-4);
     }
   }
 </style>
