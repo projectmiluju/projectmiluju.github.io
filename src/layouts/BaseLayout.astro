@@ -57,44 +57,23 @@ const fullTitle = title === siteConfig.title ? title : `${title} | ${siteConfig.
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-  <link 
-    rel="stylesheet" 
-    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+  <!-- Fonts: JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+    rel="stylesheet"
   />
 
   <!-- RSS -->
   <link rel="alternate" type="application/rss+xml" title={siteConfig.title} href="/rss.xml" />
-  
-  <!-- Theme Color -->
-  <meta name="theme-color" content="#0066cc" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#4d9fff" media="(prefers-color-scheme: dark)" />
 
-  <!-- Theme Initialization Script (prevents flash of wrong theme) -->
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#0d0d0d" />
+
+  <!-- Terminal: always dark -->
   <script is:inline>
-    (function() {
-      const STORAGE_KEY = 'theme-preference';
-      
-      function getThemePreference() {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored === 'light' || stored === 'dark') {
-          return stored;
-        }
-        return 'system';
-      }
-      
-      function getEffectiveTheme(preference) {
-        if (preference === 'system') {
-          return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        return preference;
-      }
-      
-      const preference = getThemePreference();
-      const effectiveTheme = getEffectiveTheme(preference);
-      document.documentElement.setAttribute('data-theme', effectiveTheme);
-    })();
+    document.documentElement.setAttribute('data-theme', 'terminal');
   </script>
 </head>
 <body>
