@@ -588,6 +588,7 @@ const postsData = allPosts.slice(0, 8).map(p => ({
       }
 
       if (e.key.length === 1) {
+        e.preventDefault();
         buffer += e.key;
         typedEl.textContent = buffer;
         scrollToBottom();
