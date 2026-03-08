@@ -1,7 +1,7 @@
 /* ===== Terminal Design System ===== */
 
 /* Light theme (paper terminal) */
-[data-theme="light"] {
+html[data-theme="light"] {
   --color-bg: #f0f0ec;
   --color-bg-alt: #e8e8e4;
   --color-bg-elevated: #dcdcd8;
@@ -36,10 +36,6 @@
   --shadow-card-hover: 0 0 0 1px var(--color-accent), 0 4px 20px rgba(0, 122, 30, 0.1);
 }
 
-/* Header backdrop for light theme */
-[data-theme="light"] .header {
-  background-color: rgba(240, 240, 236, 0.97) !important;
-}
 
 :root {
   /* Terminal Color Palette */
