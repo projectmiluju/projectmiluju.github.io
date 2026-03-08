@@ -3,485 +3,561 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { siteConfig } from '../config/site';
 ---
 
-<BaseLayout 
+<BaseLayout
   title="About"
   description="백엔드/인프라 중심의 풀스택 엔지니어. 신뢰성, 성능, 자동화를 추구합니다."
 >
-  <section class="section">
+  <div class="about-page">
     <div class="container">
-      <!-- Hero Section -->
-      <header class="about-hero reveal">
-        <div class="hero-content">
-          <div class="profile-image-wrapper">
-            <img 
-              src="/images/profile.png" 
-              alt="Profile" 
-              class="profile-image"
-              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-            />
-            <div class="profile-placeholder">
-              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
+
+      <!-- ══ Identity Terminal ══ -->
+      <header class="identity-section reveal">
+        <div class="terminal-window identity-terminal">
+          <div class="terminal-titlebar">
+            <div class="terminal-dots">
+              <span class="terminal-dot dot-close"></span>
+              <span class="terminal-dot dot-minimize"></span>
+              <span class="terminal-dot dot-maximize"></span>
+            </div>
+            <span class="terminal-title">about.txt — {siteConfig.name}@portfolio</span>
+            <span class="terminal-title-right">bash</span>
+          </div>
+          <div class="identity-body">
+            <!-- Profile image col -->
+            <div class="profile-col">
+              <div class="profile-frame">
+                <img
+                  src="/images/profile.png"
+                  alt="Profile"
+                  class="profile-img"
+                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+                />
+                <div class="profile-placeholder" aria-hidden="true">
+                  <span class="placeholder-ascii">[ ? ]</span>
+                </div>
+              </div>
+              <div class="profile-links">
+                <a href={siteConfig.links.github} class="profile-link" target="_blank" rel="noopener noreferrer">
+                  [github]
+                </a>
+                <a href={`mailto:${siteConfig.author.email}`} class="profile-link">
+                  [email]
+                </a>
+              </div>
+            </div>
+
+            <!-- Info col -->
+            <div class="info-col">
+              <div class="info-cmd">
+                <span class="p-dollar">$ </span><span class="p-cmd">cat about.txt</span>
+              </div>
+              <div class="info-fields">
+                <div class="info-row">
+                  <span class="field-key">name   </span>
+                  <span class="field-sep">: </span>
+                  <span class="field-val field-bright">정원용</span>
+                </div>
+                <div class="info-row">
+                  <span class="field-key">role   </span>
+                  <span class="field-sep">: </span>
+                  <span class="field-val field-accent">Backend/Infra 중심 풀스택 엔지니어</span>
+                </div>
+                <div class="info-row">
+                  <span class="field-key">email  </span>
+                  <span class="field-sep">: </span>
+                  <a href={`mailto:${siteConfig.author.email}`} class="field-val field-link">{siteConfig.author.email}</a>
+                </div>
+                <div class="info-row">
+                  <span class="field-key">github </span>
+                  <span class="field-sep">: </span>
+                  <a href={siteConfig.links.github} class="field-val field-link" target="_blank" rel="noopener noreferrer">github.com/projectmiluju</a>
+                </div>
+                <div class="info-divider">──────────────────────────────────────</div>
+                <div class="info-bio">
+                  <p><span class="bio-prefix">&gt; </span>복잡한 문제를 단순하게 해결하고,</p>
+                  <p><span class="bio-prefix">&gt; </span>자동화를 통해 팀의 생산성을 높입니다.</p>
+                  <p><span class="bio-prefix">&gt; </span>사용자에게 가치를 전달하는 전체 과정을 이해하고</p>
+                  <p><span class="bio-prefix">&gt; </span>기여할 수 있는 엔지니어를 지향합니다.</p>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="hero-text">
-            <h1 class="about-title">정원용</h1>
-            <p class="about-subtitle">Backend/Infra 중심 풀스택 엔지니어</p>
-            <p class="about-tagline">복잡한 문제를 단순하게 해결하고, 자동화를 통해 팀의 생산성을 높입니다.</p>
-          </div>
-        </div>
-        
-        <!-- Quick Links -->
-        <div class="quick-links">
-          <a href={siteConfig.links.github} class="quick-link card-3d" target="_blank" rel="noopener noreferrer">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-            </svg>
-            <span>GitHub</span>
-          </a>
-          <a href={`mailto:${siteConfig.author.email}`} class="quick-link card-3d">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="2" y="4" width="20" height="16" rx="2"/>
-              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-            </svg>
-            <span>Email</span>
-          </a>
         </div>
       </header>
 
-      <!-- Bento Grid Layout -->
-      <div class="bento-grid">
-        <!-- About Me -->
-        <div class="bento-card bento-large reveal stagger-1">
-          <div class="card-header">
-            <div class="card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-            </div>
-            <h2>소개</h2>
-          </div>
-          <div class="card-content">
-            <p>
-              <strong>신뢰성 있는 시스템</strong>을 설계하고 구축하는 것을 좋아하는 엔지니어입니다.
-              백엔드와 인프라를 중심으로 경험을 쌓았지만, 프론트엔드까지 아우르는 풀스택 역량을 갖추고 있습니다.
-            </p>
-            <p>
-              사용자에게 가치를 전달하는 전체 과정을 이해하고 기여할 수 있는 엔지니어를 지향합니다.
-            </p>
-          </div>
-        </div>
+      <!-- ══ Content Grid ══ -->
+      <div class="content-grid">
 
-        <!-- Experience -->
-        <div class="bento-card bento-medium reveal stagger-2">
-          <div class="card-header">
-            <div class="card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-              </svg>
-            </div>
-            <h2>경력</h2>
+        <!-- 경력 -->
+        <div class="term-card reveal stagger-1">
+          <div class="card-titlebar">
+            <span class="card-cmd">$ cat experience.log</span>
+            <span class="card-file">experience.log</span>
           </div>
-          <div class="card-content">
-            <div class="experience-item">
-              <div class="exp-header">
-                <h3>(주)더헤르츠</h3>
-                <span class="exp-period">2025.11 - 2025.12</span>
+          <div class="card-body">
+            <div class="exp-entry">
+              <div class="exp-header-row">
+                <span class="exp-period">[2025.11 – 2025.12]</span>
+                <span class="exp-company">(주)더헤르츠</span>
               </div>
-              <p class="exp-role">Fullstack Engineer</p>
-              <ul class="exp-highlights">
-                <li>Next.js 기반 통합 브랜드 웹 플랫폼 구축</li>
-                <li>AWS (S3, CloudFront) 배포 인프라 구축</li>
-                <li>GitHub Actions CI/CD 자동화</li>
+              <div class="exp-role">
+                <span class="field-key">role</span>
+                <span class="field-sep"> : </span>
+                <span class="field-accent">Fullstack Engineer</span>
+              </div>
+              <ul class="exp-list">
+                <li><span class="li-arrow">·</span> Next.js 기반 통합 브랜드 웹 플랫폼 구축</li>
+                <li><span class="li-arrow">·</span> AWS (S3, CloudFront) 배포 인프라 구축</li>
+                <li><span class="li-arrow">·</span> GitHub Actions CI/CD 자동화</li>
               </ul>
             </div>
           </div>
         </div>
 
-        <!-- Education -->
-        <div class="bento-card bento-medium reveal stagger-3">
-          <div class="card-header">
-            <div class="card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-              </svg>
-            </div>
-            <h2>학력</h2>
+        <!-- 학력 -->
+        <div class="term-card reveal stagger-2">
+          <div class="card-titlebar">
+            <span class="card-cmd">$ cat education.txt</span>
+            <span class="card-file">education.txt</span>
           </div>
-          <div class="card-content">
-            <div class="education-list">
-              <div class="edu-item">
-                <h3>학점은행제</h3>
-                <p class="edu-detail">컴퓨터공학과 학사 수료예정</p>
-                <span class="edu-period">2025.03 - 2026.08</span>
+          <div class="card-body">
+            <div class="edu-entry">
+              <div class="edu-period">[2025.03 – 2026.08]</div>
+              <div class="edu-name">학점은행제</div>
+              <div class="edu-detail">컴퓨터공학과 학사 수료예정</div>
+            </div>
+            <div class="edu-sep">──────────────</div>
+            <div class="edu-entry">
+              <div class="edu-period">[2013.03 – 2021.08]</div>
+              <div class="edu-name">인하대학교</div>
+              <div class="edu-detail">산업경영공학과 학사</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 기술 스택 (full width) -->
+        <div class="term-card term-card-full reveal stagger-3">
+          <div class="card-titlebar">
+            <span class="card-cmd">$ ls -la skills/</span>
+            <span class="card-file">skills/</span>
+          </div>
+          <div class="card-body skills-body">
+            <div class="skill-group">
+              <div class="skill-group-name">Backend/</div>
+              <div class="skill-tags">
+                <span class="skill-tag skill-primary">Java</span>
+                <span class="skill-tag skill-primary">Spring Boot</span>
+                <span class="skill-tag">JPA</span>
+                <span class="skill-tag">Node.js</span>
+                <span class="skill-tag">TypeScript</span>
               </div>
-              <div class="edu-item">
-                <h3>인하대학교</h3>
-                <p class="edu-detail">산업경영공학과 학사</p>
-                <span class="edu-period">2013.03 - 2021.08</span>
+            </div>
+            <div class="skill-group">
+              <div class="skill-group-name">Infra/</div>
+              <div class="skill-tags">
+                <span class="skill-tag skill-primary">AWS</span>
+                <span class="skill-tag skill-primary">Docker</span>
+                <span class="skill-tag">Kubernetes</span>
+                <span class="skill-tag">GitHub Actions</span>
+                <span class="skill-tag">Terraform</span>
+              </div>
+            </div>
+            <div class="skill-group">
+              <div class="skill-group-name">Database/</div>
+              <div class="skill-tags">
+                <span class="skill-tag skill-primary">PostgreSQL</span>
+                <span class="skill-tag skill-primary">MySQL</span>
+                <span class="skill-tag">Redis</span>
+                <span class="skill-tag">MongoDB</span>
+              </div>
+            </div>
+            <div class="skill-group">
+              <div class="skill-group-name">Frontend/</div>
+              <div class="skill-tags">
+                <span class="skill-tag skill-primary">React</span>
+                <span class="skill-tag skill-primary">Next.js</span>
+                <span class="skill-tag">TypeScript</span>
+                <span class="skill-tag">Vite</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Tech Stack -->
-        <div class="bento-card bento-full reveal stagger-4">
-          <div class="card-header">
-            <div class="card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="16 18 22 12 16 6"></polyline>
-                <polyline points="8 6 2 12 8 18"></polyline>
-              </svg>
-            </div>
-            <h2>기술 스택</h2>
+        <!-- 가치관 -->
+        <div class="term-card reveal stagger-4">
+          <div class="card-titlebar">
+            <span class="card-cmd">$ cat values.md</span>
+            <span class="card-file">values.md</span>
           </div>
-          <div class="card-content">
-            <div class="tech-grid">
-              <div class="tech-category">
-                <h3>Backend</h3>
-                <div class="tech-tags">
-                  <span class="tech-tag primary">Java</span>
-                  <span class="tech-tag primary">Spring Boot</span>
-                  <span class="tech-tag">JPA</span>
-                  <span class="tech-tag">Node.js</span>
-                  <span class="tech-tag">TypeScript</span>
+          <div class="card-body">
+            <div class="values-list">
+              <div class="value-row">
+                <span class="val-check">✓</span>
+                <div class="val-content">
+                  <span class="val-title">단순함을 추구</span>
+                  <span class="val-desc">복잡한 문제를 단순하게 해결하는 것이 좋은 엔지니어링</span>
                 </div>
               </div>
-              <div class="tech-category">
-                <h3>Infrastructure</h3>
-                <div class="tech-tags">
-                  <span class="tech-tag primary">AWS</span>
-                  <span class="tech-tag primary">Docker</span>
-                  <span class="tech-tag">Kubernetes</span>
-                  <span class="tech-tag">GitHub Actions</span>
+              <div class="value-row">
+                <span class="val-check">✓</span>
+                <div class="val-content">
+                  <span class="val-title">데이터로 판단</span>
+                  <span class="val-desc">감보다는 측정과 분석을 통해 의사결정</span>
                 </div>
               </div>
-              <div class="tech-category">
-                <h3>Database</h3>
-                <div class="tech-tags">
-                  <span class="tech-tag primary">PostgreSQL</span>
-                  <span class="tech-tag primary">MySQL</span>
-                  <span class="tech-tag">Redis</span>
-                  <span class="tech-tag">MongoDB</span>
+              <div class="value-row">
+                <span class="val-check">✓</span>
+                <div class="val-content">
+                  <span class="val-title">자동화를 사랑</span>
+                  <span class="val-desc">반복 작업을 줄이고 창의적인 일에 집중</span>
                 </div>
               </div>
-              <div class="tech-category">
-                <h3>Frontend</h3>
-                <div class="tech-tags">
-                  <span class="tech-tag primary">React</span>
-                  <span class="tech-tag primary">Next.js</span>
-                  <span class="tech-tag">TypeScript</span>
-                  <span class="tech-tag">Vite</span>
+              <div class="value-row">
+                <span class="val-check">✓</span>
+                <div class="val-content">
+                  <span class="val-title">함께 성장</span>
+                  <span class="val-desc">지식을 공유하고 팀 전체가 발전하는 환경</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Values -->
-        <div class="bento-card bento-medium reveal stagger-5">
-          <div class="card-header">
-            <div class="card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-              </svg>
-            </div>
-            <h2>가치관</h2>
+        <!-- 일하는 방식 -->
+        <div class="term-card reveal stagger-5">
+          <div class="card-titlebar">
+            <span class="card-cmd">$ cat work-style.md</span>
+            <span class="card-file">work-style.md</span>
           </div>
-          <div class="card-content">
-            <ul class="values-list">
-              <li>
-                <strong>단순함을 추구</strong>
-                <span>복잡한 문제를 단순하게 해결하는 것이 좋은 엔지니어링</span>
-              </li>
-              <li>
-                <strong>데이터로 판단</strong>
-                <span>감보다는 측정과 분석을 통해 의사결정</span>
-              </li>
-              <li>
-                <strong>자동화를 사랑</strong>
-                <span>반복 작업을 줄이고 창의적인 일에 집중</span>
-              </li>
-              <li>
-                <strong>함께 성장</strong>
-                <span>지식을 공유하고 팀 전체가 발전하는 환경</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Work Style -->
-        <div class="bento-card bento-medium reveal stagger-6">
-          <div class="card-header">
-            <div class="card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-            </div>
-            <h2>일하는 방식</h2>
-          </div>
-          <div class="card-content">
+          <div class="card-body">
             <ul class="work-list">
-              <li>문제의 본질을 먼저 파악하고 효과적인 해결책을 찾습니다</li>
-              <li>코드 리뷰를 통해 지식을 공유하고 품질을 높입니다</li>
-              <li>문서화와 기록을 중요하게 생각합니다</li>
-              <li>작은 단위로 자주 배포하고 빠르게 피드백을 반영합니다</li>
+              <li><span class="li-arrow">→</span> 문제의 본질을 먼저 파악하고 효과적인 해결책을 찾습니다</li>
+              <li><span class="li-arrow">→</span> 코드 리뷰를 통해 지식을 공유하고 품질을 높입니다</li>
+              <li><span class="li-arrow">→</span> 문서화와 기록을 중요하게 생각합니다</li>
+              <li><span class="li-arrow">→</span> 작은 단위로 자주 배포하고 빠르게 피드백을 반영합니다</li>
             </ul>
           </div>
         </div>
+
       </div>
     </div>
-  </section>
+  </div>
 </BaseLayout>
 
 <style>
-  .section {
-    padding: var(--space-10) 0 var(--space-20);
+  .about-page {
+    padding: calc(var(--header-height) + var(--space-10)) 0 var(--space-20);
+    font-family: var(--font-mono);
   }
 
-  /* Hero Section */
-  .about-hero {
-    text-align: center;
-    margin-bottom: var(--space-12);
-    padding-bottom: var(--space-10);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .hero-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-6);
+  /* ── Identity Terminal ── */
+  .identity-section {
     margin-bottom: var(--space-8);
   }
 
-  .profile-image-wrapper {
-    position: relative;
+  .identity-terminal {
+    overflow: hidden;
   }
 
-  .profile-image {
-    width: 120px;
-    height: 120px;
+  .terminal-window {
+    background-color: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .terminal-titlebar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .terminal-dots {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .terminal-dot {
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
+  }
+
+  .dot-close    { background-color: #ff5f57; }
+  .dot-minimize { background-color: #febc2e; }
+  .dot-maximize { background-color: #28c840; }
+
+  .terminal-title {
+    flex: 1;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+
+  .terminal-title-right {
+    font-size: var(--text-xs);
+    color: var(--color-text-dim);
+    flex-shrink: 0;
+  }
+
+  .identity-body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0;
+  }
+
+  /* Profile column */
+  .profile-col {
+    padding: var(--space-6) var(--space-6) var(--space-6) var(--space-5);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .profile-frame {
+    width: 100px;
+    height: 100px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: var(--color-bg-elevated);
+  }
+
+  .profile-img {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border: 3px solid var(--color-border);
-    box-shadow: var(--shadow-lg);
+    filter: grayscale(20%);
   }
 
   .profile-placeholder {
     display: none;
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    background-color: var(--color-bg-alt);
-    border: 3px solid var(--color-border);
+    width: 100%;
+    height: 100%;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-muted);
   }
 
-  .hero-text {
-    max-width: 480px;
-  }
-
-  .about-title {
-    font-size: var(--text-4xl);
-    font-weight: 700;
-    margin-bottom: var(--space-2);
-  }
-
-  .about-subtitle {
+  .placeholder-ascii {
     font-size: var(--text-lg);
-    color: var(--color-accent);
-    font-weight: 500;
-    margin-bottom: var(--space-3);
-  }
-
-  .about-tagline {
-    font-size: var(--text-base);
     color: var(--color-text-muted);
-    line-height: 1.6;
   }
 
-  /* Quick Links */
-  .quick-links {
+  .profile-links {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .profile-link {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .profile-link:hover {
+    color: var(--color-accent);
+  }
+
+  /* Info column */
+  .info-col {
+    padding: var(--space-5) var(--space-6);
+  }
+
+  .info-cmd {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .p-dollar { color: var(--color-accent); }
+  .p-cmd { color: var(--color-text-muted); }
+
+  .info-fields {
+    font-size: var(--text-sm);
+    line-height: 1.9;
+  }
+
+  .info-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+  }
+
+  .field-key {
+    color: var(--color-prompt-path);
+    white-space: pre;
+    flex-shrink: 0;
+  }
+
+  .field-sep {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  .field-val {
+    color: var(--color-text);
+  }
+
+  .field-bright {
+    color: var(--color-text-bright);
+    font-weight: 600;
+    font-size: var(--text-lg);
+  }
+
+  .field-accent {
+    color: var(--color-accent);
+  }
+
+  .field-link {
+    color: var(--color-text);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .field-link:hover {
+    color: var(--color-accent);
+  }
+
+  .info-divider {
+    color: var(--color-text-dim);
+    margin: var(--space-3) 0;
+    font-size: var(--text-xs);
+    letter-spacing: 0.05em;
+  }
+
+  .info-bio {
+    font-size: var(--text-sm);
+    line-height: 1.8;
+  }
+
+  .info-bio p {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .bio-prefix {
+    color: var(--color-text-dim);
+  }
+
+  /* ── Content Grid ── */
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: var(--space-4);
   }
 
-  .quick-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-5);
+  .term-card {
     background-color: var(--color-bg-alt);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    color: var(--color-text);
-    text-decoration: none;
-    font-size: var(--text-sm);
-    font-weight: 500;
-    transition: all var(--transition-base);
-    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
 
-  .quick-link:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-    box-shadow: var(--shadow-md);
-  }
-
-  /* Bento Grid */
-  .bento-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-6);
-  }
-
-  .bento-card {
-    background-color: var(--color-bg-alt);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    padding: var(--space-6);
-    box-shadow: var(--shadow-card);
-    transition: border-color var(--transition-base), box-shadow var(--transition-base);
-  }
-
-  .bento-card:hover {
+  .term-card:hover {
     border-color: var(--color-accent);
     box-shadow: var(--shadow-card-hover);
   }
 
-  .bento-large {
+  .term-card-full {
     grid-column: span 2;
   }
 
-  .bento-medium {
-    grid-column: span 1;
-  }
-
-  .bento-full {
-    grid-column: span 2;
-  }
-
-  .card-header {
+  .card-titlebar {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-5);
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-4);
+    background-color: var(--color-bg-elevated);
+    border-bottom: 1px solid var(--color-border);
   }
 
-  .card-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    background-color: var(--color-accent-light);
+  .card-cmd {
+    font-size: var(--text-xs);
     color: var(--color-accent);
-    border-radius: var(--radius-md);
   }
 
-  .card-header h2 {
-    font-size: var(--text-xl);
-    font-weight: 600;
-    margin: 0;
+  .card-file {
+    font-size: var(--text-xs);
+    color: var(--color-text-dim);
   }
 
-  .card-content p {
-    color: var(--color-text);
-    line-height: 1.7;
-    margin-bottom: var(--space-3);
-  }
-
-  .card-content p:last-child {
-    margin-bottom: 0;
+  .card-body {
+    padding: var(--space-5) var(--space-4);
+    font-size: var(--text-sm);
   }
 
   /* Experience */
-  .experience-item {
-    padding: 0;
-  }
-
-  .exp-header {
+  .exp-entry {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--space-2);
-    margin-bottom: var(--space-2);
   }
 
-  .exp-header h3 {
-    font-size: var(--text-lg);
-    font-weight: 600;
-    margin: 0;
+  .exp-header-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    flex-wrap: wrap;
   }
 
   .exp-period {
     font-size: var(--text-xs);
     color: var(--color-text-muted);
-    background-color: var(--color-bg);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
+    white-space: nowrap;
+  }
+
+  .exp-company {
+    color: var(--color-text-bright);
+    font-weight: 600;
   }
 
   .exp-role {
-    font-size: var(--text-sm);
-    color: var(--color-accent);
-    font-weight: 500;
-    margin-bottom: var(--space-3);
+    font-size: var(--text-xs);
+    display: flex;
+    align-items: baseline;
   }
 
-  .exp-highlights {
+  .field-accent { color: var(--color-accent); }
+
+  .exp-list {
     list-style: none;
     padding: 0;
-    margin: 0;
+    margin: var(--space-2) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
   }
 
-  .exp-highlights li {
-    font-size: var(--text-sm);
+  .exp-list li {
+    font-size: var(--text-xs);
     color: var(--color-text-muted);
-    padding-left: var(--space-4);
-    position: relative;
-    margin-bottom: var(--space-2);
+    display: flex;
+    gap: var(--space-2);
+    line-height: 1.6;
   }
 
-  .exp-highlights li::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0.5em;
-    width: 6px;
-    height: 6px;
-    background-color: var(--color-accent);
-    border-radius: 50%;
+  .li-arrow {
+    color: var(--color-accent);
+    flex-shrink: 0;
   }
 
   /* Education */
-  .education-list {
+  .edu-entry {
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
-  }
-
-  .edu-item h3 {
-    font-size: var(--text-base);
-    font-weight: 600;
-    margin: 0 0 var(--space-1);
-  }
-
-  .edu-detail {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-    margin: 0 0 var(--space-1);
+    gap: var(--space-1);
   }
 
   .edu-period {
@@ -489,131 +565,176 @@ import { siteConfig } from '../config/site';
     color: var(--color-text-muted);
   }
 
-  /* Tech Grid */
-  .tech-grid {
+  .edu-name {
+    color: var(--color-text-bright);
+    font-weight: 600;
+  }
+
+  .edu-detail {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .edu-sep {
+    color: var(--color-text-dim);
+    font-size: var(--text-xs);
+    margin: var(--space-3) 0;
+  }
+
+  /* Skills */
+  .skills-body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-6);
+    gap: var(--space-5);
   }
 
-  .tech-category h3 {
-    font-size: var(--text-sm);
+  .skill-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .skill-group-name {
+    font-size: var(--text-xs);
+    color: var(--color-prompt-path);
     font-weight: 600;
-    color: var(--color-text-muted);
-    margin-bottom: var(--space-3);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.03em;
   }
 
-  .tech-tags {
+  .skill-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-1);
   }
 
-  .tech-tag {
+  .skill-tag {
     font-size: var(--text-xs);
-    padding: var(--space-1) var(--space-3);
-    background-color: var(--color-bg);
+    padding: 0.1em 0.5em;
+    border: 1px solid var(--color-border);
     color: var(--color-text-muted);
     border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
   }
 
-  .tech-tag.primary {
-    background-color: var(--color-accent-light);
+  .skill-primary {
+    border-color: rgba(0, 255, 65, 0.2);
     color: var(--color-accent);
-    border-color: transparent;
-    font-weight: 500;
+    background-color: var(--color-accent-light);
   }
 
   /* Values */
   .values-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .values-list li {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--color-border);
+    gap: 0;
   }
 
-  .values-list li:last-child {
+  .value-row {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
+    align-items: flex-start;
+  }
+
+  .value-row:last-child {
     border-bottom: none;
     padding-bottom: 0;
   }
 
-  .values-list li:first-child {
+  .value-row:first-child {
     padding-top: 0;
   }
 
-  .values-list strong {
+  .val-check {
+    color: var(--color-accent);
+    flex-shrink: 0;
+    font-size: var(--text-sm);
+    margin-top: 1px;
+  }
+
+  .val-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .val-title {
+    color: var(--color-text-bright);
     font-size: var(--text-sm);
     font-weight: 600;
-    color: var(--color-text);
   }
 
-  .values-list span {
-    font-size: var(--text-sm);
+  .val-desc {
     color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    line-height: 1.6;
   }
 
-  /* Work List */
+  /* Work style */
   .work-list {
     list-style: none;
     padding: 0;
     margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
   }
 
   .work-list li {
+    display: flex;
+    gap: var(--space-3);
     font-size: var(--text-sm);
-    color: var(--color-text);
-    padding: var(--space-2) 0;
-    padding-left: var(--space-5);
-    position: relative;
+    color: var(--color-text-muted);
+    line-height: 1.6;
   }
 
-  .work-list li::before {
-    content: '→';
-    position: absolute;
-    left: 0;
+  .work-list .li-arrow {
     color: var(--color-accent);
+    flex-shrink: 0;
   }
 
-  /* Responsive */
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .skills-body {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
   @media (max-width: 768px) {
-    .bento-grid {
+    .about-page {
+      padding-top: calc(var(--header-height) + var(--space-6));
+    }
+
+    .identity-body {
       grid-template-columns: 1fr;
     }
 
-    .bento-large,
-    .bento-medium,
-    .bento-full {
+    .profile-col {
+      flex-direction: row;
+      border-right: none;
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-4);
+    }
+
+    .profile-frame {
+      width: 72px;
+      height: 72px;
+    }
+
+    .profile-links {
+      flex-direction: row;
+    }
+
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .term-card-full {
       grid-column: span 1;
     }
 
-    .tech-grid {
+    .skills-body {
       grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-    }
-
-    .about-title {
-      font-size: var(--text-3xl);
-    }
-
-    .profile-image,
-    .profile-placeholder {
-      width: 100px;
-      height: 100px;
-    }
-
-    .quick-links {
-      flex-direction: column;
-      align-items: center;
     }
   }
 </style>
