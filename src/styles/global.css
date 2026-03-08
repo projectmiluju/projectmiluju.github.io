@@ -1,4 +1,46 @@
 /* ===== Terminal Design System ===== */
+
+/* Light theme (paper terminal) */
+[data-theme="light"] {
+  --color-bg: #f0f0ec;
+  --color-bg-alt: #e8e8e4;
+  --color-bg-elevated: #dcdcd8;
+  --color-text: #1a1a1a;
+  --color-text-bright: #0a0a0a;
+  --color-text-muted: #6a6a6a;
+  --color-text-dim: #9a9a9a;
+  --color-border: #c4c4c0;
+  --color-border-hover: #a4a4a0;
+  --color-accent: #007a1e;
+  --color-accent-hover: #005a16;
+  --color-accent-light: rgba(0, 122, 30, 0.08);
+  --color-accent-glow: rgba(0, 122, 30, 0.15);
+  --color-error: #cc2200;
+  --color-warning: #b45309;
+  --color-success: #007a1e;
+  --color-code-bg: #e4e4e0;
+  --color-prompt-user: #1a1a1a;
+  --color-prompt-host: #007a1e;
+  --color-prompt-path: #005f87;
+  --color-comment: #a0a09c;
+  --color-string: #7c3a00;
+  --glass-bg: rgba(240, 240, 236, 0.96);
+  --glass-border: rgba(0, 122, 30, 0.12);
+  --glass-shadow: rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 24px var(--color-accent-glow);
+  --shadow-card: 0 0 0 1px var(--color-border);
+  --shadow-card-hover: 0 0 0 1px var(--color-accent), 0 4px 20px rgba(0, 122, 30, 0.1);
+}
+
+/* Header backdrop for light theme */
+[data-theme="light"] .header {
+  background-color: rgba(240, 240, 236, 0.97) !important;
+}
+
 :root {
   /* Terminal Color Palette */
   --color-bg: #0d0d0d;
@@ -510,29 +552,6 @@ hr {
   margin: var(--space-2) 0;
 }
 
-/* Section divider */
-.section-divider {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-10);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.section-divider::before,
-.section-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background-color: var(--color-border);
-}
-
-.section-divider .divider-cmd {
-  color: var(--color-accent);
-  white-space: nowrap;
-}
-
 /* Reveal animations for scroll */
 .reveal {
   opacity: 0;
@@ -553,45 +572,10 @@ hr {
 .stagger-5 { transition-delay: 200ms; }
 .stagger-6 { transition-delay: 250ms; }
 
-.animate-fade-in {
-  animation: fadeIn var(--transition-base) ease-out;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.4s ease forwards;
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.4s ease forwards;
-}
-
-.animate-scale-in {
-  animation: scaleIn 0.3s ease forwards;
-}
-
 /* ===== Utility Classes ===== */
-.text-gradient {
-  background: linear-gradient(90deg, var(--color-accent), #00aaff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
 .text-accent { color: var(--color-accent); }
 .text-muted { color: var(--color-text-muted); }
 .text-bright { color: var(--color-text-bright); }
-
-/* Terminal tag/badge */
-.term-badge {
-  display: inline-block;
-  font-size: var(--text-xs);
-  font-family: var(--font-mono);
-  padding: 0.1em 0.5em;
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
-  background-color: var(--color-accent-light);
-  border-radius: var(--radius-sm);
-}
 
 /* ===== Scroll Progress Bar ===== */
 .scroll-progress {
@@ -613,40 +597,6 @@ hr {
   box-shadow: 0 0 8px var(--color-accent-glow);
 }
 
-/* ===== Glass Card Effect ===== */
-.glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 24px var(--glass-shadow);
-}
-
-/* ===== 3D Card Effects (minimal for terminal) ===== */
-@media (hover: hover) and (pointer: fine) {
-  .card-3d {
-    transition: transform var(--transition-base), box-shadow var(--transition-base);
-  }
-
-  .link-underline {
-    position: relative;
-  }
-
-  .link-underline::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    width: 0;
-    height: 1px;
-    background-color: var(--color-accent);
-    transition: width var(--transition-base);
-  }
-
-  .link-underline:hover::after {
-    width: 100%;
-  }
-}
 
 /* ===== Reduced Motion ===== */
 @media (prefers-reduced-motion: reduce) {
