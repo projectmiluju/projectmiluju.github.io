@@ -244,7 +244,12 @@ const catColor: Record<string, string> = {
     // Series
     serFilter?.addEventListener('click', e => {
       const btn = e.target.closest('.series-pill');
-      if (btn) { filters.series = btn.dataset.series; filters.category = ''; applyFilters(); }
+      if (btn) {
+        filters.series = btn.dataset.series;
+        // Update category to match the series
+        if (btn.dataset.category) filters.category = btn.dataset.category;
+        applyFilters();
+      }
     });
 
     // View all buttons
@@ -252,7 +257,9 @@ const catColor: Record<string, string> = {
       btn.addEventListener('click', e => {
         e.preventDefault();
         filters.series = btn.dataset.series;
-        filters.category = '';
+        // Update category from the series block context
+        const block = btn.closest('.series-block');
+        if (block && block.dataset.category) filters.category = block.dataset.category;
         applyFilters();
       });
     });
@@ -282,51 +289,97 @@ const catColor: Record<string, string> = {
 
       updateUI();
 
-      const hasFilter = filters.category || filters.series || filters.tag || filters.search;
-      if (!hasFilter) {
-        groupedView.hidden = false;
-        filteredView.hidden = true;
-        emptyState.hidden = true;
-        activeBar.hidden = true;
-        return;
-      }
+      const hasSearchOrTag = filters.search || filters.tag;
+      const hasSeries = !!filters.series;
+      const hasCategory = !!filters.category;
 
-      const filtered = postsData.filter(p => {
-        if (filters.category && p.category !== filters.category) return false;
-        if (filters.series   && p.series   !== filters.series)   return false;
-        if (filters.tag      && !p.tags.includes(filters.tag))   return false;
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          if (!p.title.toLowerCase().includes(q) &&
-              !p.summary.toLowerCase().includes(q) &&
-              !p.tags.some(t => t.toLowerCase().includes(q))) return false;
+      // If we have a specific search, tag, or series selected, show the flat filtered view
+      if (hasSearchOrTag || hasSeries) {
+        const filtered = postsData.filter(p => {
+          if (filters.category && p.category !== filters.category) return false;
+          if (filters.series   && p.series   !== filters.series)   return false;
+          if (filters.tag      && !p.tags.includes(filters.tag))   return false;
+          if (filters.search) {
+            const q = filters.search.toLowerCase();
+            if (!p.title.toLowerCase().includes(q) &&
+                !p.summary.toLowerCase().includes(q) &&
+                !p.tags.some(t => t.toLowerCase().includes(q))) return false;
+          }
+          return true;
+        });
+
+        groupedView.hidden = true;
+        activeBar.hidden = false;
+        renderBadges();
+
+        if (filtered.length === 0) {
+          filteredView.hidden = true;
+          emptyState.hidden = false;
+          if (emptyQuery) emptyQuery.textContent = filters.search || filters.tag || filters.series || filters.category;
+        } else {
+          filteredView.hidden = false;
+          emptyState.hidden = true;
+          renderFiltered(filtered);
         }
-        return true;
-      });
-
-      groupedView.hidden = true;
-      activeBar.hidden = false;
-      renderBadges();
-
-      if (filtered.length === 0) {
-        filteredView.hidden = true;
-        emptyState.hidden = false;
-        if (emptyQuery) emptyQuery.textContent = filters.search || filters.tag || filters.series || filters.category;
       } else {
-        filteredView.hidden = false;
+        // No search/tag/series: Show grouped view (possibly filtered by category)
+        filteredView.hidden = true;
         emptyState.hidden = true;
-        renderFiltered(filtered);
+        groupedView.hidden = false;
+        
+        if (hasCategory) {
+          activeBar.hidden = false;
+          renderBadges();
+          // Filter series blocks in grouped view
+          groupedView.querySelectorAll('.series-block').forEach(block => {
+            const cat = block.dataset.category;
+            block.style.display = (cat === filters.category) ? '' : 'none';
+          });
+        } else {
+          activeBar.hidden = true;
+          // Show all series blocks
+          groupedView.querySelectorAll('.series-block').forEach(block => {
+            block.style.display = '';
+          });
+        }
       }
     }
 
     function updateUI() {
+      // Update Category pills
       catFilter?.querySelectorAll('.pill').forEach(b => {
-        b.classList.toggle('active', b.dataset.category === filters.category && !filters.series);
+        b.classList.toggle('active', b.dataset.category === filters.category);
       });
+
+      // Update Series pills visibility based on Category
       serFilter?.querySelectorAll('.series-pill').forEach(b => {
+        const seriesCat = b.dataset.category;
+        const isVisible = !filters.category || seriesCat === filters.category;
+        b.style.display = isVisible ? '' : 'none';
         b.classList.toggle('active', b.dataset.series === filters.series);
       });
+
+      // Determine relevant tags based on Category and Series
+      const relevantPosts = postsData.filter(p => {
+        if (filters.category && p.category !== filters.category) return false;
+        if (filters.series && p.series !== filters.series) return false;
+        return true;
+      });
+      const relevantTags = new Set(relevantPosts.flatMap(p => p.tags));
+
+      // If current tag filter is no longer relevant, clear it
+      if (filters.tag && !relevantTags.has(filters.tag)) {
+        filters.tag = '';
+        // We don't call applyFilters here to avoid infinite loop, 
+        // but we need the next render to reflect this.
+        // The calling applyFilters will handle the final state.
+      }
+
+      // Update Tag pills visibility
       tagFilter?.querySelectorAll('.tag-pill').forEach(b => {
+        const tag = b.dataset.tag;
+        const isVisible = relevantTags.has(tag);
+        b.style.display = isVisible ? '' : 'none';
         b.classList.toggle('active', b.dataset.tag === filters.tag);
       });
     }
