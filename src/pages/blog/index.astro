@@ -16,6 +16,7 @@ const postsData = allPosts.map(post => ({
   category: post.data.category,
   tags: post.data.tags,
   series: post.data.series || '기타',
+  cover: post.data.cover,
 }));
 
 const postsBySeries = allPosts.reduce((acc, post) => {
@@ -133,25 +134,52 @@ const catColor: Record<string, string> = {
             if (seriesPosts.length === 0) return null;
             return (
               <section class="series-block reveal" data-category={seriesConfig.category} data-series-name={seriesConfig.slug}>
-                <div class="series-titlebar">
-                  <span class="series-titlebar-icon">{seriesConfig.icon}</span>
-                  <span class="series-titlebar-name">{seriesConfig.name}</span>
-                  <span class="series-titlebar-count">{seriesPosts.length} posts</span>
+                <div class="series-header">
+                  <span class="series-header-icon">{seriesConfig.icon}</span>
+                  <span class="series-header-name">{seriesConfig.name}</span>
+                  <span class="series-header-count">{seriesPosts.length} posts</span>
                   <button class="series-view-all" data-series={seriesConfig.slug}>[view all]</button>
                 </div>
-                <div class="series-posts-list">
-                  {seriesPosts.slice(0, 4).map(post => {
-                    const filename = post.slug.split('/').pop() + '.md';
+                <div class="series-grid-layout">
+                  {seriesPosts.map(post => {
                     const dateStr = post.data.date.toISOString().split('T')[0];
                     const clr = catColor[post.data.category] || 'var(--color-accent)';
                     return (
-                      <a href={`/blog/${post.slug}`} class="post-row">
-                        <span class="post-row-icon" style={`color:${clr}`}>▶</span>
-                        <span class="post-row-file">{filename}</span>
-                        <span class="post-row-date">{dateStr}</span>
-                        <span class="post-row-cat" style={`color:${clr}`}>[{categoryLabels[post.data.category]}]</span>
-                        <span class="post-row-summary">{post.data.summary}</span>
-                      </a>
+                      <article class="fcard">
+                        <a href={`/blog/${post.slug}`} class="fcard-link">
+                          <div class="fcard-file-header">
+                            <span class="fcard-icon">▶</span>
+                            <span class="fcard-file-name">{seriesConfig.slug}/</span>
+                            <span class="fcard-date">{dateStr}</span>
+                          </div>
+                          
+                          {post.data.cover && (
+                            <div class="fcard-cover">
+                              <img src={post.data.cover} alt={post.data.title} loading="lazy" />
+                              <div class="fcard-cover-overlay"></div>
+                            </div>
+                          )}
+
+                          <div class="fcard-body">
+                            <h3 class="fcard-title">{post.data.title}</h3>
+                            <div class="fcard-field">
+                              <span class="field-name">category</span>
+                              <span class="field-sep"> : </span>
+                              <span class="field-value" style={{ color: clr }}>[{categoryLabels[post.data.category]}]</span>
+                            </div>
+                            <p class="fcard-summary">{post.data.summary}</p>
+                            <div class="fcard-stack">
+                              {post.data.tags.slice(0, 3).map(tag => (
+                                <span class="stack-tag">#{tag}</span>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div class="fcard-file-footer">
+                            <span class="footer-enter">↵ enter</span>
+                          </div>
+                        </a>
+                      </article>
                     );
                   })}
                 </div>
@@ -161,24 +189,51 @@ const catColor: Record<string, string> = {
 
           {postsBySeries['기타'] && postsBySeries['기타'].length > 0 && (
             <section class="series-block reveal" data-series-name="기타">
-              <div class="series-titlebar">
-                <span class="series-titlebar-icon">📄</span>
-                <span class="series-titlebar-name">기타</span>
-                <span class="series-titlebar-count">{postsBySeries['기타'].length} posts</span>
+              <div class="series-header">
+                <span class="series-header-icon">📄</span>
+                <span class="series-header-name">기타</span>
+                <span class="series-header-count">{postsBySeries['기타'].length} posts</span>
               </div>
-              <div class="series-posts-list">
-                {postsBySeries['기타'].slice(0, 4).map(post => {
-                  const filename = post.slug.split('/').pop() + '.md';
+              <div class="series-grid-layout">
+                {postsBySeries['기타'].map(post => {
                   const dateStr = post.data.date.toISOString().split('T')[0];
                   const clr = catColor[post.data.category] || 'var(--color-accent)';
                   return (
-                    <a href={`/blog/${post.slug}`} class="post-row">
-                      <span class="post-row-icon" style={`color:${clr}`}>▶</span>
-                      <span class="post-row-file">{filename}</span>
-                      <span class="post-row-date">{dateStr}</span>
-                      <span class="post-row-cat" style={`color:${clr}`}>[{categoryLabels[post.data.category]}]</span>
-                      <span class="post-row-summary">{post.data.summary}</span>
-                    </a>
+                    <article class="fcard">
+                      <a href={`/blog/${post.slug}`} class="fcard-link">
+                        <div class="fcard-file-header">
+                          <span class="fcard-icon">▶</span>
+                          <span class="fcard-file-name">기타/</span>
+                          <span class="fcard-date">{dateStr}</span>
+                        </div>
+                        
+                        {post.data.cover && (
+                          <div class="fcard-cover">
+                            <img src={post.data.cover} alt={post.data.title} loading="lazy" />
+                            <div class="fcard-cover-overlay"></div>
+                          </div>
+                        )}
+
+                        <div class="fcard-body">
+                          <h3 class="fcard-title">{post.data.title}</h3>
+                          <div class="fcard-field">
+                            <span class="field-name">category</span>
+                            <span class="field-sep"> : </span>
+                            <span class="field-value" style={{ color: clr }}>[{categoryLabels[post.data.category]}]</span>
+                          </div>
+                          <p class="fcard-summary">{post.data.summary}</p>
+                          <div class="fcard-stack">
+                            {post.data.tags.slice(0, 3).map(tag => (
+                              <span class="stack-tag">#{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div class="fcard-file-footer">
+                          <span class="footer-enter">↵ open</span>
+                        </div>
+                      </a>
+                    </article>
                   );
                 })}
               </div>
@@ -246,7 +301,6 @@ const catColor: Record<string, string> = {
       const btn = e.target.closest('.series-pill');
       if (btn) {
         filters.series = btn.dataset.series;
-        // Update category to match the series
         if (btn.dataset.category) filters.category = btn.dataset.category;
         applyFilters();
       }
@@ -257,7 +311,6 @@ const catColor: Record<string, string> = {
       btn.addEventListener('click', e => {
         e.preventDefault();
         filters.series = btn.dataset.series;
-        // Update category from the series block context
         const block = btn.closest('.series-block');
         if (block && block.dataset.category) filters.category = block.dataset.category;
         applyFilters();
@@ -293,8 +346,8 @@ const catColor: Record<string, string> = {
       const hasSeries = !!filters.series;
       const hasCategory = !!filters.category;
 
-      // If we have a specific search, tag, or series selected, show the flat filtered view
-      if (hasSearchOrTag || hasSeries) {
+      // Logic change: If we only have a category or a series (no search/tag), stay in grouped view
+      if (hasSearchOrTag) {
         const filtered = postsData.filter(p => {
           if (filters.category && p.category !== filters.category) return false;
           if (filters.series   && p.series   !== filters.series)   return false;
@@ -315,33 +368,31 @@ const catColor: Record<string, string> = {
         if (filtered.length === 0) {
           filteredView.hidden = true;
           emptyState.hidden = false;
-          if (emptyQuery) emptyQuery.textContent = filters.search || filters.tag || filters.series || filters.category;
+          if (emptyQuery) emptyQuery.textContent = filters.search || filters.tag;
         } else {
           filteredView.hidden = false;
           emptyState.hidden = true;
           renderFiltered(filtered);
         }
       } else {
-        // No search/tag/series: Show grouped view (possibly filtered by category)
+        // No search/tag: Show grouped view (possibly filtered by category and/or series)
         filteredView.hidden = true;
         emptyState.hidden = true;
         groupedView.hidden = false;
         
-        if (hasCategory) {
-          activeBar.hidden = false;
-          renderBadges();
-          // Filter series blocks in grouped view
-          groupedView.querySelectorAll('.series-block').forEach(block => {
-            const cat = block.dataset.category;
-            block.style.display = (cat === filters.category) ? '' : 'none';
-          });
-        } else {
-          activeBar.hidden = true;
-          // Show all series blocks
-          groupedView.querySelectorAll('.series-block').forEach(block => {
-            block.style.display = '';
-          });
-        }
+        activeBar.hidden = !(hasCategory || hasSeries);
+        if (hasCategory || hasSeries) renderBadges();
+
+        groupedView.querySelectorAll('.series-block').forEach(block => {
+          const cat = block.dataset.category;
+          const sName = block.dataset.seriesName;
+          
+          let isVisible = true;
+          if (filters.category && cat !== filters.category) isVisible = false;
+          if (filters.series && sName !== filters.series) isVisible = false;
+          
+          block.style.display = isVisible ? '' : 'none';
+        });
       }
     }
 
@@ -367,12 +418,8 @@ const catColor: Record<string, string> = {
       });
       const relevantTags = new Set(relevantPosts.flatMap(p => p.tags));
 
-      // If current tag filter is no longer relevant, clear it
       if (filters.tag && !relevantTags.has(filters.tag)) {
         filters.tag = '';
-        // We don't call applyFilters here to avoid infinite loop, 
-        // but we need the next render to reflect this.
-        // The calling applyFilters will handle the final state.
       }
 
       // Update Tag pills visibility
@@ -399,25 +446,36 @@ const catColor: Record<string, string> = {
         const date = post.date.split('T')[0];
         const clr = catColor[post.category] || 'var(--color-accent)';
         const catLabel = categoryLabels[post.category] || post.category;
-        const tagsHtml = post.tags.slice(0, 3).map(t => `<span class="ftag">#${t}</span>`).join('');
-        const fname = post.slug.split('/').pop() + '.md';
+        const tagsHtml = post.tags.slice(0, 3).map(t => `<span class="stack-tag">#${t}</span>`).join('');
+        const coverHtml = post.cover ? `
+          <div class="fcard-cover">
+            <img src="${post.cover}" alt="${post.title}" loading="lazy" />
+            <div class="fcard-cover-overlay"></div>
+          </div>
+        ` : '';
+
         return `
           <article class="fcard">
             <a href="/blog/${post.slug}" class="fcard-link">
-              <div class="fcard-cmd">
-                <span class="fc-dollar">$</span>
-                <span class="fc-cmd"> cat <span style="color:var(--color-prompt-path)">${post.slug.split('/').slice(-2).join('/')+'.md'}</span></span>
+              <div class="fcard-file-header">
+                <span class="fcard-icon">▶</span>
+                <span class="fcard-file-name">${post.series}/</span>
+                <span class="fcard-date">${date}</span>
               </div>
+              ${coverHtml}
               <div class="fcard-body">
-                <div class="fcard-meta">
-                  <span style="color:${clr}">[${catLabel}]</span>
-                  <span class="fcard-date">${date}</span>
+                <h3 class="fcard-title">${post.title}</h3>
+                <div class="fcard-field">
+                  <span class="field-name">category</span>
+                  <span class="field-sep"> : </span>
+                  <span class="field-value" style="color:${clr}">[${catLabel}]</span>
                 </div>
-                <h3 class="fcard-title"># ${post.title}</h3>
-                <p class="fcard-summary"><span style="color:var(--color-text-dim)">&gt; </span>${post.summary}</p>
-                <div class="fcard-tags">${tagsHtml}</div>
+                <p class="fcard-summary">${post.summary}</p>
+                <div class="fcard-stack">${tagsHtml}</div>
               </div>
-              <div class="fcard-foot">[→ open]</div>
+              <div class="fcard-file-footer">
+                <span class="footer-enter">↵ open</span>
+              </div>
             </a>
           </article>
         `;
@@ -432,520 +490,98 @@ const catColor: Record<string, string> = {
     font-family: var(--font-mono);
   }
 
-  /* ── Header ── */
-  .page-header {
-    margin-bottom: var(--space-8);
-  }
-
-  .header-cmd {
-    font-size: var(--text-base);
-    margin-bottom: var(--space-3);
-  }
-
+  .page-header { margin-bottom: var(--space-8); }
+  .header-cmd { font-size: var(--text-base); margin-bottom: var(--space-3); }
   .p-dollar { color: var(--color-accent); }
   .p-cmd    { color: var(--color-text-bright); }
   .p-result { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .header-desc { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0; padding-left: var(--space-4); border-left: 2px solid var(--color-border); }
 
-  .header-desc {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-    margin: 0;
-    padding-left: var(--space-4);
-    border-left: 2px solid var(--color-border);
-  }
+  .search-section { margin-bottom: var(--space-6); }
+  .search-row { display: flex; align-items: center; gap: 0; font-size: var(--text-sm); max-width: 560px; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background-color: var(--color-bg-alt); transition: border-color var(--transition-fast); }
+  .search-row:focus-within { border-color: var(--color-accent); }
+  .search-prefix, .search-suffix { color: var(--color-text-muted); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); white-space: nowrap; flex-shrink: 0; }
+  .search-input { flex: 1; background: transparent; border: none; outline: none; color: var(--color-text-bright); font-family: var(--font-mono); font-size: var(--text-sm); padding: var(--space-2) 0; min-width: 0; }
+  .search-input::placeholder { color: var(--color-text-dim); }
+  .search-btn { font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-2) var(--space-3); background: transparent; border: none; border-left: 1px solid var(--color-border); color: var(--color-text-muted); cursor: pointer; white-space: nowrap; transition: all var(--transition-fast); }
+  .search-btn:hover { color: var(--color-accent); background-color: var(--color-accent-light); }
 
-  /* ── Search ── */
-  .search-section {
-    margin-bottom: var(--space-6);
-  }
+  .filters-section { display: flex; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-6); padding: var(--space-4); background-color: var(--color-bg-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .filter-row { display: flex; align-items: flex-start; gap: var(--space-3); }
+  .filter-row-tags { align-items: center; flex-wrap: wrap; }
+  .filter-prefix { font-size: var(--text-xs); color: var(--color-text-muted); white-space: nowrap; padding-top: 3px; flex-shrink: 0; }
+  .filter-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .pill { font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-1) var(--space-3); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-muted); cursor: pointer; transition: all var(--transition-fast); }
+  .pill:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .pill.active { border-color: var(--color-accent); color: var(--color-accent); background-color: var(--color-accent-light); }
 
-  .search-row {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    font-size: var(--text-sm);
-    max-width: 560px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    background-color: var(--color-bg-alt);
-    transition: border-color var(--transition-fast);
-  }
-
-  .search-row:focus-within {
-    border-color: var(--color-accent);
-  }
-
-  .search-prefix,
-  .search-suffix {
-    color: var(--color-text-muted);
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .search-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--color-text-bright);
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    padding: var(--space-2) 0;
-    min-width: 0;
-  }
-
-  .search-input::placeholder {
-    color: var(--color-text-dim);
-  }
-
-  .search-btn {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    padding: var(--space-2) var(--space-3);
-    background: transparent;
-    border: none;
-    border-left: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all var(--transition-fast);
-  }
-
-  .search-btn:hover {
-    color: var(--color-accent);
-    background-color: var(--color-accent-light);
-  }
-
-  /* ── Filters ── */
-  .filters-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    margin-bottom: var(--space-6);
-    padding: var(--space-4);
-    background-color: var(--color-bg-alt);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-  }
-
-  .filter-row {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-3);
-  }
-
-  .filter-row-tags {
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .filter-prefix {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    white-space: nowrap;
-    padding-top: 3px;
-    flex-shrink: 0;
-  }
-
-  .filter-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .pill {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    padding: var(--space-1) var(--space-3);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .pill:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-  }
-
-  .pill.active {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-    background-color: var(--color-accent-light);
-  }
-
-  /* Series pills */
-  .series-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .series-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    padding: var(--space-1) var(--space-2);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .series-pill:hover {
-    border-color: var(--color-accent);
-    color: var(--color-text-bright);
-  }
-
-  .series-pill.active {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-    background-color: var(--color-accent-light);
-  }
-
+  .series-grid { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .series-pill { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--text-xs); padding: var(--space-1) var(--space-2); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-muted); cursor: pointer; transition: all var(--transition-fast); }
+  .series-pill:hover { border-color: var(--color-accent); color: var(--color-text-bright); }
+  .series-pill.active { border-color: var(--color-accent); color: var(--color-accent); background-color: var(--color-accent-light); }
   .series-icon { font-size: 1em; }
-  .series-name { }
-  .series-count {
-    font-size: var(--text-xs);
-    color: var(--color-text-dim);
-    margin-left: 2px;
-  }
+  .series-count { font-size: var(--text-xs); color: var(--color-text-dim); margin-left: 2px; }
 
-  /* Tag pills */
-  .tag-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .tag-pill {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: var(--space-1) var(--space-1);
-    transition: color var(--transition-fast);
-  }
-
+  .tag-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .tag-pill { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); background: transparent; border: none; cursor: pointer; padding: var(--space-1) var(--space-1); transition: color var(--transition-fast); }
   .tag-pill:hover { color: var(--color-accent); }
   .tag-pill.active { color: var(--color-accent); text-decoration: underline; }
 
-  /* ── Active filters bar ── */
-  .active-filters {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-    font-size: var(--text-xs);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background-color: var(--color-bg-alt);
-    flex-wrap: wrap;
-  }
-
+  .active-filters { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-6); font-size: var(--text-xs); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background-color: var(--color-bg-alt); flex-wrap: wrap; }
   .af-prefix { color: var(--color-accent); flex-shrink: 0; }
   .filter-badges { display: flex; gap: var(--space-2); flex-wrap: wrap; flex: 1; }
-
-  .badge {
-    color: var(--color-text-muted);
-    border: 1px solid var(--color-border);
-    padding: 0.1em 0.4em;
-    border-radius: var(--radius-sm);
-  }
-
-  .af-clear {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--color-error);
-    background: none;
-    border: none;
-    cursor: pointer;
-    margin-left: auto;
-    flex-shrink: 0;
-  }
-
+  .badge { color: var(--color-text-muted); border: 1px solid var(--color-border); padding: 0.1em 0.4em; border-radius: var(--radius-sm); }
+  .af-clear { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-error); background: none; border: none; cursor: pointer; margin-left: auto; flex-shrink: 0; }
   .af-clear:hover { opacity: 0.8; }
 
-  /* ── Series blocks (grouped view) ── */
-  .series-sections {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-6);
-  }
+  .series-sections { display: flex; flex-direction: column; gap: var(--space-10); }
+  .series-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
+  .series-header-icon { font-size: var(--text-base); }
+  .series-header-name { color: var(--color-text-bright); font-size: var(--text-base); font-weight: 600; flex: 1; }
+  .series-header-count { color: var(--color-text-muted); font-size: var(--text-xs); }
+  .series-view-all { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-accent); background: none; border: 1px solid var(--color-accent); padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); cursor: pointer; transition: all var(--transition-fast); }
+  .series-view-all:hover { background-color: var(--color-accent-light); }
+  .series-grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-6); }
 
-  .series-block {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    background-color: var(--color-bg-alt);
-    transition: border-color var(--transition-fast);
-  }
+  .filtered-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-6); }
 
-  .series-block:hover {
-    border-color: var(--color-border-hover);
-  }
-
-  .series-titlebar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-    background-color: var(--color-bg-elevated);
-    border-bottom: 1px solid var(--color-border);
-    font-size: var(--text-xs);
-  }
-
-  .series-titlebar-icon { flex-shrink: 0; }
-
-  .series-titlebar-name {
-    color: var(--color-text-bright);
-    font-weight: 600;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .series-titlebar-count {
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-  }
-
-  .series-view-all {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: color var(--transition-fast);
-  }
-
-  .series-view-all:hover { color: var(--color-accent); }
-
-  /* Post rows inside series */
-  .series-posts-list {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .post-row {
-    display: grid;
-    grid-template-columns: 16px 1fr auto auto;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    text-decoration: none;
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    border-bottom: 1px solid var(--color-border);
-    transition: background-color var(--transition-fast), color var(--transition-fast);
-  }
-
-  .post-row:last-child { border-bottom: none; }
-
-  .post-row:hover {
-    background-color: var(--color-accent-light);
-    color: var(--color-text-bright);
-  }
-
-  .post-row-icon {
-    font-size: 0.6em;
-    flex-shrink: 0;
-    transition: transform var(--transition-fast);
-  }
-
-  .post-row:hover .post-row-icon {
-    transform: translateX(3px);
-  }
-
-  .post-row-file {
-    color: var(--color-prompt-path);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-sm);
-    transition: color var(--transition-fast);
-  }
-
-  .post-row:hover .post-row-file { color: var(--color-text-bright); }
-
-  .post-row-date {
-    font-size: var(--text-xs);
-    color: var(--color-text-dim);
-    white-space: nowrap;
-  }
-
-  .post-row-cat {
-    font-size: var(--text-xs);
-    white-space: nowrap;
-  }
-
-  .post-row-summary {
-    display: none;
-  }
-
-  /* ── Filtered grid ── */
-  .filtered-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: var(--space-4);
-  }
-
-  /* Filtered card */
-  .fcard {
-    background-color: var(--color-bg-alt);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  }
-
-  .fcard:hover {
-    border-color: var(--color-accent);
-    box-shadow: var(--shadow-card-hover);
-  }
-
-  .fcard-link {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    text-decoration: none;
-    color: inherit;
-  }
-
-  .fcard-cmd {
-    padding: var(--space-2) var(--space-3);
-    background-color: var(--color-bg-elevated);
-    border-bottom: 1px solid var(--color-border);
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .fc-dollar { color: var(--color-accent); }
-
-  .fcard-body {
-    flex: 1;
-    padding: var(--space-3) var(--space-3);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .fcard-meta {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    font-size: var(--text-xs);
-    font-family: var(--font-mono);
-  }
-
-  .fcard-date { color: var(--color-text-muted); }
-
-  .fcard-title {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text-bright);
-    line-height: 1.4;
-    margin: 0;
-    transition: color var(--transition-fast);
-  }
-
+  .fcard { background-color: var(--color-bg-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); display: flex; flex-direction: column; height: 100%; }
+  .fcard:hover { border-color: var(--color-accent); box-shadow: var(--shadow-card-hover); }
+  .fcard-link { display: flex; flex-direction: column; height: 100%; text-decoration: none; color: inherit; }
+  .fcard-file-header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); background-color: var(--color-bg-elevated); border-bottom: 1px solid var(--color-border); overflow: hidden; }
+  .fcard-icon { color: var(--color-accent); font-size: var(--text-xs); flex-shrink: 0; transition: transform var(--transition-fast); }
+  .fcard:hover .fcard-icon { transform: translateX(3px); }
+  .fcard-file-name { color: var(--color-text-bright); font-size: var(--text-xs); font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fcard-date { font-size: var(--text-xs); color: var(--color-text-muted); flex-shrink: 0; }
+  .fcard-cover { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background-color: var(--color-code-bg); }
+  .fcard-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--transition-slow), filter var(--transition-slow); filter: grayscale(30%) brightness(0.8); }
+  .fcard-cover-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(13, 13, 13, 0.8)); }
+  .fcard:hover .fcard-cover img { transform: scale(1.03); filter: grayscale(0%) brightness(0.9); }
+  .fcard-body { flex: 1; padding: var(--space-4) var(--space-4) var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+  .fcard-title { font-size: var(--text-base); font-weight: 600; color: var(--color-text-bright); line-height: 1.4; margin: 0; transition: color var(--transition-fast); }
   .fcard:hover .fcard-title { color: var(--color-accent); }
+  .fcard-field { font-size: var(--text-xs); line-height: 1.5; }
+  .field-name { color: var(--color-prompt-path); }
+  .field-sep  { color: var(--color-text-muted); }
+  .field-value { color: var(--color-text); }
+  .fcard-summary { font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fcard-stack { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: auto; }
+  .stack-tag { font-size: var(--text-xs); padding: 0.1em 0.45em; border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); transition: all var(--transition-fast); }
+  .fcard:hover .stack-tag { border-color: rgba(0, 255, 65, 0.2); color: var(--color-accent); background-color: var(--color-accent-light); }
+  .fcard-file-footer { padding: var(--space-2) var(--space-4); border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; }
+  .footer-enter { font-size: var(--text-xs); color: var(--color-text-dim); transition: color var(--transition-fast); }
+  .fcard:hover .footer-enter { color: var(--color-accent); }
 
-  .fcard-summary {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    line-height: 1.7;
-    margin: 0;
-    flex: 1;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .fcard-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .ftag {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-    transition: color var(--transition-fast);
-  }
-
-  .fcard:hover .ftag { color: var(--color-accent); }
-
-  .fcard-foot {
-    padding: var(--space-2) var(--space-3);
-    border-top: 1px solid var(--color-border);
-    font-size: var(--text-xs);
-    color: var(--color-text-dim);
-    text-align: right;
-    transition: color var(--transition-fast);
-  }
-
-  .fcard:hover .fcard-foot { color: var(--color-accent); }
-
-  /* ── Empty state ── */
-  .empty-state {
-    padding: var(--space-16) 0;
-    font-size: var(--text-sm);
-  }
-
+  .empty-state { padding: var(--space-16) 0; font-size: var(--text-sm); }
   .empty-cmd { color: var(--color-text-muted); }
   .empty-query { color: var(--color-text-bright); }
+  .empty-msg { margin-top: var(--space-4); color: var(--color-text-muted); }
+  .reset-btn { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-accent); background: none; border: none; cursor: pointer; }
 
-  .empty-msg {
-    margin-top: var(--space-4);
-    color: var(--color-text-muted);
-  }
-
-  .reset-btn {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--color-accent);
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
-
-  /* ── Responsive ── */
   @media (max-width: 768px) {
-    .blog-page {
-      padding-top: calc(var(--header-height) + var(--space-6));
-    }
-
-    .post-row {
-      grid-template-columns: 16px 1fr auto;
-    }
-
-    .post-row-cat { display: none; }
-
-    .filtered-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .search-row {
-      max-width: 100%;
-    }
+    .blog-page { padding-top: calc(var(--header-height) + var(--space-6)); }
+    .series-grid-layout, .filtered-grid { grid-template-columns: 1fr; gap: var(--space-4); }
+    .search-row { max-width: 100%; }
+    .fcard-body { padding: var(--space-3); }
   }
 </style>
