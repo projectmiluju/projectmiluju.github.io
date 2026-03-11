@@ -110,7 +110,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
         <button class="af-clear" id="clear-filters">[clear]</button>
       </div>
 
-      <!-- ══ Posts (Unified Grouped View) ══ -->
+      <!-- ══ Posts ══ -->
       <div id="posts-container" class="series-sections">
         {siteConfig.blogSeries.map(seriesConfig => {
           const seriesPosts = postsBySeries[seriesConfig.slug] || [];
@@ -265,7 +265,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
     const badgesEl    = document.getElementById('filter-badges');
     const clearBtn    = document.getElementById('clear-filters');
     const resetBtn    = document.getElementById('reset-filters');
-    const groupedView = document.getElementById('posts-container');
+    const postsContainer = document.getElementById('posts-container');
     const emptyState  = document.getElementById('empty-state');
     const emptyQuery  = document.getElementById('empty-query');
 
@@ -320,24 +320,39 @@ const postsBySeries = allPosts.reduce((acc, post) => {
 
       let totalVisible = 0;
       const q = filters.search.toLowerCase();
+      // Limit to 3 per series if in "all" state OR "category-only" state
+      const isLimitedState = !filters.series && !filters.tag && !filters.search;
+
+      // Track card visibility per series for the limited state
+      const seriesVisibleCounts: Record<string, number> = {};
 
       // Filter individual cards
       document.querySelectorAll('.post-card-wrapper').forEach(el => {
         const card = el as HTMLElement;
         const cCat = card.dataset.category;
-        const cSer = card.dataset.series;
+        const cSer = card.dataset.series || '기타';
         const cTags = card.dataset.tags?.split(',') || [];
         const cTitle = card.dataset.title?.toLowerCase() || '';
         const cSum = card.dataset.summary?.toLowerCase() || '';
 
-        let isVisible = true;
-        if (filters.category && cCat !== filters.category) isVisible = false;
-        if (filters.series && cSer !== filters.series) isVisible = false;
-        if (filters.tag && !cTags.includes(filters.tag)) isVisible = false;
-        if (q && !cTitle.includes(q) && !cSum.includes(q) && !cTags.some(t => t.toLowerCase().includes(q))) isVisible = false;
+        let isMatch = true;
+        if (filters.category && cCat !== filters.category) isMatch = false;
+        if (filters.series && cSer !== filters.series) isMatch = false;
+        if (filters.tag && !cTags.includes(filters.tag)) isMatch = false;
+        if (q && !cTitle.includes(q) && !cSum.includes(q) && !cTags.some(t => t.toLowerCase().includes(q))) isMatch = false;
 
-        card.style.display = isVisible ? '' : 'none';
-        if (isVisible) totalVisible++;
+        let shouldShow = isMatch;
+        // If in a limited state, apply the 3-card-per-series limit
+        if (isLimitedState && isMatch) {
+          if (!seriesVisibleCounts[cSer]) seriesVisibleCounts[cSer] = 0;
+          if (seriesVisibleCounts[cSer] >= 3) {
+            shouldShow = false;
+          }
+          seriesVisibleCounts[cSer]++;
+        }
+
+        card.style.display = shouldShow ? '' : 'none';
+        if (shouldShow) totalVisible++;
       });
 
       // Filter series blocks
@@ -363,7 +378,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
         sb.classList.toggle('active', sb.dataset.series === filters.series);
       });
 
-      // Update Tag pills visibility based on Category/Series selection
+      // Update Tag pills visibility
       const visibleCards = Array.from(document.querySelectorAll('.post-card-wrapper')).filter(el => {
         const card = el as HTMLElement;
         if (filters.category && card.dataset.category !== filters.category) return false;
@@ -452,7 +467,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
   .series-view-all:hover { background-color: var(--color-accent-light); }
   .series-grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-6); }
 
-  /* Card 스타일 (ProjectCard와 동일) */
+  /* Blog Post Card (ProjectCard Style) */
   .blog-post-card { background-color: var(--color-bg-alt); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); display: flex; flex-direction: column; height: 100%; }
   .blog-post-card:hover { border-color: var(--color-accent); box-shadow: var(--shadow-card-hover); }
   .card-link { display: flex; flex-direction: column; height: 100%; text-decoration: none; color: inherit; }
