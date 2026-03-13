@@ -90,6 +90,13 @@ export const siteConfig = {
       category: 'til',
       folder: 'til/til',
       icon: '📚'
+    },
+    {
+      slug: 'Grovarc 개발기',
+      name: 'Grovarc 개발기',
+      category: 'til',
+      folder: 'til/grovarc-devlog',
+      icon: '🛠️'
     }
   ],
 };
