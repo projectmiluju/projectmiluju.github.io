@@ -97,6 +97,13 @@ export const siteConfig = {
       category: 'til',
       folder: 'til/grovarc-devlog',
       icon: '🛠️'
+    },
+    {
+      slug: 'CastCanvas Lab 개발기',
+      name: 'CastCanvas Lab 개발기',
+      category: 'til',
+      folder: 'til/castcanvas-lab-devlog',
+      icon: '🎨'
     }
   ],
 };
