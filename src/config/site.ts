@@ -104,6 +104,13 @@ export const siteConfig = {
       category: 'til',
       folder: 'til/castcanvas-lab-devlog',
       icon: '🎨'
+    },
+    {
+      slug: 'BoothLiner 개발기',
+      name: 'BoothLiner 개발기',
+      category: 'til',
+      folder: 'til/boothliner-devlog',
+      icon: '🧩'
     }
   ],
 };

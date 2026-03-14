@@ -1,0 +1,242 @@
+---
+title: "BoothLiner 데모를 AWS Amplify로 옮기고, 정식 제품 배포 구조까지 미리 정리하기"
+date: 2026-03-15
+summary: "Vite 기반 BoothLiner 데모를 Vercel에서 AWS Amplify로 옮긴 이유와 설정 포인트, 그리고 web/admin/mobile/backend 기준의 이후 AWS 배포 구조까지 한 번에 정리했다."
+tags: ["AWS", "Amplify", "CloudFront", "Route53", "ACM", "Vite", "React", "Deployment", "Architecture"]
+category: "til"
+series: "BoothLiner 개발기"
+---
+
+# BoothLiner 데모를 AWS Amplify로 옮기고, 정식 제품 배포 구조까지 미리 정리하기
+
+BoothLiner 데모는 원래 Vercel에 올려 두고 검증하고 있었다. 내부 확인용으로는 충분했지만, 잠재 고객에게 공유하는 링크가 `vercel.app` 주소인 상태는 오래 유지할 구성이 아니었다. 데모라도 실제 서비스처럼 보여야 했고, 이후 정식 제품이 AWS 위에 올라갈 가능성이 높았기 때문에 이번 기회에 배포 시작점 자체를 AWS로 옮겼다.
+
+이번 작업은 단순한 호스팅 변경보다, "지금 데모는 어디에 어떻게 올릴지"와 "정식 제품은 어떤 단위로 배포를 분리할지"를 한 번에 정리하는 작업에 가까웠다.
+
+---
+
+## 목표
+
+- Vite 기반 React SPA 데모를 AWS에서 가볍게 운영 가능한 구조로 전환
+- `www.boothliner.com` 같은 브랜드 도메인 기준으로 외부 공유 링크 정리
+- 이후 `web`, `admin`, `mobile`, `backend`로 확장될 제품 구조까지 미리 설계 기준 확보
+
+---
+
+## 핵심 구현 포인트
+
+### 1) 현재 데모는 서버가 아니라 정적 SPA다
+
+현재 데모 프로젝트의 조건은 명확했다.
+
+- Vite + React + TypeScript 기반 SPA
+- 서버 사이드 렌더링 없음
+- 데이터베이스 없음
+- 인증과 리드 흐름은 `localStorage` 기반 데모
+- `react-router-dom`을 사용하는 브라우저 라우팅 구조
+
+즉, 서버 프로세스를 운영해야 하는 앱이 아니라 빌드 결과물만 안정적으로 서빙하면 되는 프론트엔드였다. 이 조건이면 ECS, EKS, Lambda 같은 선택지는 과하고, 정적 호스팅이 맞다.
+
+### 2) 그래서 현재 데모는 AWS Amplify Hosting으로 옮겼다
+
+이번 이관의 기준은 세 가지였다.
+
+- 커스텀 도메인을 붙여 브랜드 신뢰도를 높일 것
+- AWS 위에서 운영 시작점을 만들 것
+- 지금 단계에 불필요한 인프라 복잡도는 늘리지 않을 것
+
+이 기준에서는 Amplify가 가장 현실적이었다.
+
+- Git 저장소 연결만으로 빌드와 배포를 붙일 수 있다
+- 정적 React 앱에 필요한 HTTPS와 CDN 구성이 바로 나온다
+- Vercel에서 쓰던 "정적 프론트엔드 자동 배포" 감각을 유지할 수 있다
+- 지금 단계에서 S3 + CloudFront를 직접 조립해도 얻는 이점이 크지 않다
+
+현재 데모 배포 구조는 아래처럼 정리했다.
+
+- 소스 저장소: GitHub
+- 프론트 배포: AWS Amplify Hosting
+- 커스텀 도메인: `www.boothliner.com`
+- DNS 등록기관: Gabia
+- SSL: Amplify 관리형 인증서
+
+배포용 설정도 정적 앱 기준으로 단순했다.
+
+```yaml
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+```
+
+### 3) BrowserRouter를 쓰는 SPA라서 재작성 규칙이 필수였다
+
+이 프로젝트는 `/explore`, `/scan/:boothId`, `/admin/dashboard` 같은 경로를 브라우저 라우팅으로 처리한다. 정적 호스팅에 그대로 올리면 새로고침 시 서버가 실제 파일 경로로 이해해서 404를 내기 쉽다.
+
+그래서 Amplify에 아래 재작성 규칙을 추가했다.
+
+```json
+[
+  {
+    "source": "/<*>",
+    "status": "404-200",
+    "target": "/index.html"
+  }
+]
+```
+
+정적 SPA 배포에서는 이 규칙이 사실상 기본값에 가깝다. 앱 내부 이동은 멀쩡한데 직접 접근이나 새로고침에서 깨지는 문제를 막아 준다.
+
+### 4) Gabia 도메인 연결은 `www` 우선으로 단순화했다
+
+도메인은 가비아에서 구매하고 DNS도 가비아에서 관리했다. 여기서 한 번 걸렸던 부분은 루트 도메인 연결이었다.
+
+Amplify는 루트 도메인과 `www`를 같이 붙이도록 유도하지만, 가비아 기본 DNS 화면에서는 `ANAME` 같은 apex alias 레코드를 바로 쓰기 어려웠다. 그래서 이번 단계에서는 아래처럼 정리했다.
+
+- SSL 검증용 레코드: `CNAME`
+- `www`: `CNAME`
+- 루트 도메인 `boothliner.com`: 직접 연결 보류
+
+즉 외부 공유 주소는 `https://www.boothliner.com`으로 통일했다. 데모 단계에서 중요한 건 모든 경우를 억지로 처리하는 것보다, 실제로 쓰는 주소를 안정적으로 살리는 것이다.
+
+### 5) 현재 데모 기준 결론은 "AWS로 옮기되 무겁게 가지 않는다"였다
+
+이번 데모 배포에서 얻은 결론은 분명했다.
+
+- Vercel 대신 AWS로 옮긴다
+- 하지만 ECS 같은 운영형 구조로는 가지 않는다
+- 정적 데모 성격에 맞춰 Amplify Hosting을 쓴다
+- 외부 공유 링크는 `https://www.boothliner.com`으로 통일한다
+
+즉 지금 AWS를 선택한 이유는 "복잡한 인프라 운영"이 아니라 "브랜드 신뢰도와 이후 확장 기반"이다.
+
+### 6) 정식 제품은 `web`, `admin`, `mobile`, `backend`로 배포 단위를 분리해야 한다
+
+여기서부터는 데모와 결이 다르다. 정식 제품은 단일 정적 프론트엔드가 아니라 역할이 다른 제품군이다.
+
+- `boothliner-web`
+- `boothliner-admin`
+- `boothliner-mobile`
+- `boothliner-backend`
+
+이 네 개를 한 덩어리로 배포하면 나중에 운영, 보안, 배포 속도, 장애 범위 관리가 전부 꼬이기 쉽다. 처음부터 배포 단위와 책임을 나누는 편이 맞다.
+
+### 7) 제품별 권장 AWS 배포 방향은 다르게 가져가야 한다
+
+#### `boothliner-web`
+
+공개 웹은 SEO와 첫 진입 경험이 중요하다.
+
+- 정적 중심이면 `S3 + CloudFront + Route 53 + ACM`
+- SSR 요구가 커지면 `Amplify SSR` 또는 `ECS/Fargate` 기반 Next.js 검토
+- 권장 도메인: `www.boothliner.com`
+
+현재 기준으로는 제품 초기에 정적 배포를 우선하고, SSR 필요가 명확해질 때 런타임 호스팅으로 넘어가는 흐름이 현실적이다.
+
+#### `boothliner-admin`
+
+관리자 도구는 검색 노출보다 인증과 권한이 중요하다.
+
+- 프레임워크: React SPA 또는 Next.js app
+- 배포: `S3 + CloudFront` 또는 `Amplify Hosting`
+- 보호: Cognito 또는 자체 인증, 필요 시 WAF/IP 정책
+- 권장 도메인: `admin.boothliner.com`
+
+백오피스는 SSR보다 정적 배포 + API 호출 구조가 먼저 맞을 가능성이 높다.
+
+#### `boothliner-mobile`
+
+모바일은 웹 호스팅 문제가 아니라 앱 배포와 인증, API 연동 문제다.
+
+- 앱: React Native 또는 Flutter
+- 배포 채널: App Store, Google Play, TestFlight, Firebase App Distribution
+- 푸시: FCM, APNs
+- 파일 저장: S3
+
+즉 모바일은 웹 배포 전략에서 분리해서 봐야 한다.
+
+#### `boothliner-backend`
+
+가장 운영 복잡도가 커지는 레이어는 결국 백엔드다.
+
+- API 런타임: ECS Fargate
+- 진입점: ALB
+- 네트워크: VPC private subnet 중심
+- 데이터베이스: RDS PostgreSQL
+- 캐시: ElastiCache Redis
+- 파일 저장: S3
+- 비동기 처리: SQS
+- 스케줄 작업: EventBridge
+- 비밀 관리: Secrets Manager / Parameter Store
+- 모니터링: CloudWatch + Sentry
+
+초기 서비스 기준으로는 Lambda보다 ECS Fargate가 더 균형이 좋다고 봤다. 인증, 리드, 파일, 알림, 외부 연동이 점점 붙는 서비스는 결국 컨테이너 기반 운영 쪽이 구조를 예측하기 쉽다.
+
+### 8) 도메인과 CI/CD도 제품 단위로 끊는 편이 맞다
+
+권장 도메인 구조는 아래처럼 분리하는 쪽이 깔끔하다.
+
+- `www.boothliner.com`: 공개 웹
+- `admin.boothliner.com`: 관리자 백오피스
+- `api.boothliner.com`: 백엔드 API
+- `assets.boothliner.com`: 정적 파일 또는 업로드 자산
+
+이 구조는 캐시 정책, 보안 정책, 장애 영향 범위, 배포 단위를 각각 분리하기 쉽다.
+
+CI/CD도 레포별로 따로 두는 게 낫다.
+
+- `boothliner-web`: build, test, 정적 배포 또는 SSR 배포
+- `boothliner-admin`: build, test, 정적 호스팅 배포
+- `boothliner-backend`: lint, test, docker build, image push, ECS deploy
+- `boothliner-mobile`: build, 내부 배포, 스토어 릴리스
+
+한 제품의 배포 실패가 다른 제품의 출시를 막지 않게 설계하는 게 중요하다.
+
+---
+
+## 트러블슈팅 / 고민 포인트
+
+### 루트 도메인까지 한 번에 붙일지, `www`만 먼저 살릴지
+
+- 원인: 가비아 DNS 기본 관리 화면에서는 Amplify가 기대하는 루트 도메인 alias 구성이 매끄럽지 않았다
+- 해결: 이번 단계에서는 루트 도메인 연결을 보류하고, `www.boothliner.com`만 CNAME 기반으로 안정적으로 연결
+
+### 데모인데도 AWS로 옮길 필요가 있는지
+
+- 원인: 기술적으로는 Vercel만으로도 충분해서, AWS 이관이 과한 선택처럼 보일 수 있었다
+- 해결: 이번 선택의 목적을 "운영 복잡도 증가"가 아니라 "브랜드 도메인 확보와 이후 제품 인프라 기준선 정리"로 두고 판단
+
+### 정식 제품도 Amplify 하나로 밀어붙일 수 있는지
+
+- 원인: 데모가 Amplify에서 잘 돌면 이후에도 같은 방식으로 계속 가고 싶어지기 쉽다
+- 해결: 공개 웹, 어드민, 모바일, 백엔드의 성격이 서로 다르다는 전제를 두고 배포 단위를 분리하기로 정리
+
+---
+
+## 결과
+
+- BoothLiner 데모를 AWS Amplify Hosting 기준으로 운영 가능한 상태로 정리했다
+- 외부 공유 도메인을 `https://www.boothliner.com` 기준으로 통일했다
+- 정적 SPA에서 필요한 rewrite 설정과 도메인 연결 기준을 정리했다
+- 이후 `web`, `admin`, `mobile`, `backend` 기준의 AWS 배포 방향까지 초안으로 확정했다
+
+---
+
+## 다음 개선 아이디어
+
+- `boothliner-web`, `boothliner-admin`, `boothliner-backend`, `boothliner-mobile`의 실제 레포 경계와 책임 범위 문서화
+- AWS 계정 구조, 권한 모델, staging/production 분리 기준 정리
+- 백엔드 기준 Terraform 또는 IaC 초안 작성
+- 공개 웹이 정적 배포로 충분한지, SSR 전환이 필요한 시점을 판단할 체크리스트 만들기
