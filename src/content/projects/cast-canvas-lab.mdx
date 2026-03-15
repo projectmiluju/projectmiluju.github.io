@@ -7,14 +7,14 @@ links:
   github: "https://github.com/projectmiluju/cast-canvas-lab-orchestrator"
   demo: "https://castcanvaslab.com/"
 highlights:
-  - "PDF·이미지·노트를 무한 캔버스 위에서 연결하는 공간형 워크스페이스 설계"
-  - "@xyflow/react 기반 노드/엣지 캔버스 인터랙션 구현"
-  - "NestJS + Yjs 기반 실시간 협업 서버 설계"
-  - "AWS S3 + CloudFront + Route53 기반 랜딩 사이트 배포 자동화"
+  - "PDF·이미지·노트를 무한 캔버스 위에서 연결하는 공간형 워크스페이스 설계 및 구현"
+  - "@xyflow/react 기반 커스텀 노드·엣지·Inspector 패널 구현 완료"
+  - "Yjs + y-protocols 기반 WebSocket 협업 프로토콜 직접 설계"
+  - "5개 레포 오케스트레이터 패턴으로 API 계약·태스크 단일 소스 관리"
 metrics:
-  - "5개 레포 MSA 아키텍처 설계 및 솔로 풀스택 개발"
+  - "5개 레포 MSA 아키텍처 솔로 풀스택 설계 및 구현"
   - "랜딩 페이지 배포 완료 (castcanvaslab.com)"
-  - "개발 진행 중"
+  - "캔버스 코어·Inspector 패널·디자인 시스템 구현 완료"
 order: 2
 draft: false
 ---
@@ -23,52 +23,138 @@ draft: false
 
 리서치를 할 때마다 같은 문제를 겪었다. 좋은 아티클은 노션에, 레퍼런스 이미지는 피그마에, 메모는 애플 노트에 흩어진다. 꺼내 볼 때마다 탭을 10개씩 열어야 하고, 아이디어 사이의 연결은 내 머릿속에만 존재한다.
 
-노션은 선형적이고, 피그마는 문서를 다루기 불편하다. **PDF, 이미지, 노트를 하나의 캔버스 위에 올려두고 화살표로 연결하는 것** — 이게 내가 원하는 도구였다.
+노션은 선형적이고, 피그마는 문서를 다루기 불편하다. **PDF, 이미지, 노트를 하나의 캔버스 위에 올려두고 연결하는 것** — 이게 내가 원하는 도구였다.
 
 > Notion보다 더 공간적으로, Figma보다 더 문서 친화적으로.
 
 ---
 
-## 구조
+## 아키텍처
 
-5개 레포가 각자의 역할을 가진다. 규모가 커지면 어느 레포에서 어느 작업을 해야 할지 혼란스러워지기 때문에, 처음부터 `orchestrator` 레포를 두고 API 계약과 작업 흐름을 한 곳에서 관리한다.
+```
+[ cast-canvas-lab-site ]  castcanvaslab.com (랜딩)
+            |
+            ▼ 앱 진입
+[ cast-canvas-lab-fe ]    app.castcanvaslab.com (워크스페이스)
+   React 19 + @xyflow/react + Yjs client
+            |              \
+            | REST API       \ WebSocket
+            ▼                 ▼
+[ cast-canvas-lab-be ]    [ cast-canvas-lab-collab ]
+  Spring Boot 3.5            NestJS 11 + Yjs
+  - 인증/인가 (JWT)          - room lifecycle
+  - 워크스페이스 API         - state-vector 동기화
+  - 캔버스 메타데이터        - update 브로드캐스트
+  - 노드/엣지 CRUD           - awareness 전파
+  - S3 signed URL 발급       - BE 권한 검증 연동
+  - 검색 API
+            |
+   ┌────────┼────────┐
+   ▼        ▼        ▼
+PostgreSQL  Redis    S3
+```
 
-| 레포 | 역할 |
-|------|------|
-| [orchestrator](https://github.com/projectmiluju/cast-canvas-lab-orchestrator) | API 계약 (OpenAPI), 크로스 레포 태스크 관리 |
-| [fe](https://github.com/projectmiluju/cast-canvas-lab-fe) | 워크스페이스 캔버스 앱 (React 19 + @xyflow/react) |
-| [be](https://github.com/projectmiluju/cast-canvas-lab-be) | REST API 서버 (Spring Boot 3.5) |
-| [collab](https://github.com/projectmiluju/cast-canvas-lab-collab) | 실시간 협업 서버 (NestJS + Yjs) |
-| [site](https://github.com/projectmiluju/cast-canvas-lab-site) | 퍼블릭 랜딩 사이트 (Next.js) — 배포 완료 |
+### 레포지토리 구성
+
+| 레포 | 역할 | 상태 |
+|------|------|------|
+| [orchestrator](https://github.com/projectmiluju/cast-canvas-lab-orchestrator) | API 계약, 크로스 레포 태스크 단일 소스 | 운영 중 |
+| [fe](https://github.com/projectmiluju/cast-canvas-lab-fe) | 워크스페이스 캔버스 앱 | 개발 중 |
+| [be](https://github.com/projectmiluju/cast-canvas-lab-be) | REST API 서버 | 개발 중 |
+| [collab](https://github.com/projectmiluju/cast-canvas-lab-collab) | 실시간 협업 서버 | 구조 완료 |
+| [site](https://github.com/projectmiluju/cast-canvas-lab-site) | 퍼블릭 랜딩 사이트 | 배포 완료 |
 
 ---
 
 ## 기술 선택 이유
 
 **@xyflow/react (React Flow v12)**
-노드와 엣지로 요소를 연결하는 캔버스를 처음부터 구현하는 건 너무 복잡하다. React Flow는 드래그, 연결, 줌, 뷰포트를 모두 제공하면서 커스텀 노드를 React 컴포넌트로 자유롭게 만들 수 있다. PDF 노드, 이미지 노드, 노트 노드를 독립적인 컴포넌트로 구성할 수 있어서 선택했다.
+노드와 엣지로 요소를 연결하는 캔버스를 처음부터 구현하는 건 너무 복잡하다. React Flow는 드래그, 연결, 줌, 뷰포트를 모두 제공하면서 커스텀 노드를 React 컴포넌트로 자유롭게 만들 수 있다. DocumentNode(PDF), ImageNode, NoteNode를 독립 컴포넌트로 구성할 수 있어 선택했다.
 
-**Yjs + NestJS (collab 서버)**
-여러 사람이 같은 캔버스를 편집할 때 충돌을 해결하려면 CRDT가 필요하다. Yjs는 검증된 CRDT 구현체고, y-protocols로 WebSocket transport를 쉽게 구성할 수 있다. 별도 collab 서버로 분리한 이유는, 협업 연결 수가 늘어날 때 BE와 독립적으로 스케일 아웃하기 위해서다.
+**Yjs + NestJS (collab 서버) — 직접 구현**
+prebuilt 협업 백엔드(e.g., Hocuspocus)를 쓰지 않고 직접 구현했다. room lifecycle, state-vector 기반 초기 동기화, update 브로드캐스트, awareness 전파를 직접 소유해야 세부 제어가 가능하다. y-protocols 표준 인코딩을 기반으로 프로토콜 명세를 먼저 작성하고, COLLAB과 FE 양쪽이 그것을 따라 구현하는 방식을 택했다.
 
 **Spring Boot (BE) + Flyway**
 캔버스 메타데이터, 워크스페이스, 사용자 데이터는 관계형 구조가 맞다. Flyway로 스키마 변경을 코드로 추적하고, 로컬-프로덕션 간 DB 상태 불일치를 막는다.
 
+**오케스트레이터 레포 패턴**
+5개 레포가 각자 작업하면 FE↔BE API 계약, FE↔COLLAB WebSocket 프로토콜이 불일치할 위험이 있다. `orchestrator` 레포에 `contracts/openapi.yaml`, `contracts/collab-protocol.md`, `tasks/MASTER_TASKS.md`를 단일 소스로 두고, 각 레포 에이전트는 이 계약을 기준으로 구현한다.
+
+```
+사용자 요청
+  ↓
+1. MASTER_TASKS.md → 현재 상태 파악
+2. ARCHITECTURE.md → 영향 레포 식별
+3. contracts/      → 계약 변경 필요 여부 판단
+   ↓ 계약 변경 필요
+  contracts/ 먼저 수정 → 각 레포에 위임
+   ↓ 단일 레포 변경
+  해당 레포에 직접 위임
+  ↓
+MASTER_TASKS.md 완료 상태 업데이트
+```
+
 ---
 
-## 현재까지 만든 것
+## Yjs 협업 프로토콜
+
+collab 서버와 FE 클라이언트 간 WebSocket 프로토콜을 직접 설계했다. 모든 메시지는 바이너리(Uint8Array)로 전송하고 y-protocols 인코딩을 따른다.
+
+**초기 동기화 흐름:**
+```
+클라이언트                       서버
+   |── WebSocket 연결 ──────────>|  (토큰 검증, BE 권한 확인)
+   |<── sync(step1: serverSV) ──|  서버 state vector 전송
+   |── sync(step2: missing) ───>|  누락 업데이트 전송
+   |── sync(step1: clientSV) ──>|  클라이언트 state vector
+   |<── sync(step2: missing) ──|  [동기화 완료]
+```
+
+**awareness 상태 스키마:**
+```typescript
+interface AwarenessState {
+  user: { id: string; nickname: string; color: string };
+  cursor: { x: number; y: number } | null; // 캔버스 좌표
+}
+```
+
+비로그인 사용자는 COLLAB에 연결할 수 없으며 로컬 Yjs만 사용한다.
+
+---
+
+## 현재까지 구현된 것
 
 **랜딩 사이트** (완료)
-Next.js로 제품 소개 페이지를 만들고 AWS S3 + CloudFront + Route53으로 배포했다. `main` 브랜치 push 시 GitHub Actions로 자동 빌드·배포된다. → [castcanvaslab.com](https://castcanvaslab.com/)
+Next.js + AWS S3 + CloudFront + Route53. main 브랜치 push 시 GitHub Actions로 자동 배포. → [castcanvaslab.com](https://castcanvaslab.com/)
+
+**캔버스 코어** (완료)
+- 무한 캔버스 pan/zoom
+- DocumentNode (PDF), ImageNode, NoteNode 컴포넌트
+- 커스텀 엣지 (삭제 버튼 포함)
+- 노드 이동·리사이즈·삭제·다중 선택
+- 파일 드롭 → 노드 생성
+- 빈 캔버스 안내 UI
+
+**Inspector 패널** (완료)
+- DocumentInspector: react-pdf 기반 PDF 뷰어
+- ImageInspector
+- NoteInspector: 텍스트 편집 (blur-on-save)
+
+**디자인 시스템** (완료)
+SCSS Modules 기반 디자인 토큰, 타이포그래피, 라이트/다크 테마
 
 **BE 기본 인프라** (완료)
-Spring Boot 3.5 기반으로 공통 응답/에러 처리, 사용자 프로필 API, Flyway 마이그레이션 구조를 구축했다.
+JWT 회원가입·로그인 API, 사용자 프로필 API, Flyway 마이그레이션 구조
 
-**collab 서버 설계** (완료)
-NestJS WebSocket 게이트웨이, Yjs 업데이트 브로드캐스트, awareness 전달 구조를 설계했다.
+**COLLAB 서버 구조** (완료)
+NestJS WebSocket 서버, Room registry, use-case 레이어(join/auth/update/awareness/disconnect)
 
 ---
 
 ## 지금 만들고 있는 것
 
-캔버스 FE 핵심 기능 — 노드 CRUD, 드래그 배치, 엣지 연결을 BE와 실제 연동하는 작업을 진행 중이다. 이후 PDF 업로드(S3), Yjs 협업 세션 연결, 검색 기능 순으로 이어간다.
+MASTER_TASKS 기준으로 병렬 진행 중:
+
+- **BE**: 워크스페이스 CRUD API, Redis 연동, S3 signed URL 발급
+- **FE**: 인증 UI (로그인/회원가입), 워크스페이스 목록·생성 페이지
+- 이후 통합: 인증 연동 → 워크스페이스 연동 → 캔버스 저장/불러오기 → 파일 업로드 → 협업 연결

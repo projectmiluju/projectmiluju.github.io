@@ -2,16 +2,16 @@
 title: "Grovarc - AI 기반 개발자 성장 기록 서비스"
 period: "2026.03 - 진행 중"
 role: "Solo Developer (Fullstack + AI)"
-stack: ["Next.js", "TypeScript", "Kotlin", "Spring Boot", "Python", "FastAPI", "LangGraph", "LLaMA 3", "RAG", "MCP SDK", "PostgreSQL", "Redis", "MongoDB", "Kafka", "Kubernetes", "Terraform", "Prometheus", "Grafana", "AWS"]
+stack: ["Next.js", "TypeScript", "Kotlin", "Spring Boot", "Kafka", "Python", "FastAPI", "LangGraph", "LLaMA 3", "RAG", "pgvector", "MCP SDK", "PostgreSQL", "Redis", "MongoDB", "Kubernetes", "Terraform", "Prometheus", "Grafana", "AWS"]
 links:
   github: "https://github.com/projectmiluju/grovarc"
 highlights:
   - "LangGraph + LLaMA 3 기반 AI Agent가 작업 로그를 분석해 회고 초안 자동 생성"
-  - "Kotlin Spring Boot + Python FastAPI 멀티 언어 백엔드 설계"
-  - "TypeScript MCP 서버로 Claude 기반 AI 인터랙션 구현"
-  - "Kubernetes + Terraform IaC 기반 인프라 설계"
+  - "pgvector + RAG로 과거 유사 문제 해결 경험 검색 구현"
+  - "TypeScript MCP 서버로 Claude에서 직접 성장 데이터 조회·분석"
+  - "Kotlin + Python 멀티 언어 모노레포, Kubernetes + Terraform IaC 인프라 설계"
 metrics:
-  - "단일 모노레포로 4개 앱(web/api/ai/mcp) 풀스택 솔로 개발"
+  - "4개 앱(web/api/ai/mcp) 모노레포 솔로 풀스택 설계"
   - "AI-assisted 개발 (Cursor Agent + Claude 바이브코딩)"
   - "개발 진행 중 (Phase 1)"
 order: 1
@@ -20,70 +20,146 @@ draft: false
 
 ## 아이디어
 
-매일 코드를 짜고, 버그를 잡고, 새 기술을 배운다. 그런데 한 달 뒤에 "요즘 뭘 배웠어?"라는 질문을 받으면 막막하다. 성장하고 있는 건 알겠는데 그게 말로 잘 안 나온다.
+매일 코드를 짜고, 버그를 잡고, 새 기술을 배운다. 그런데 한 달 뒤에 "요즘 뭘 배웠어?"라는 질문을 받으면 막막하다.
 
-회고를 써야 한다는 건 알지만 백지 앞에 앉으면 손이 안 움직인다. 뭘 썼는지, 어디서 막혔는지 기억을 되살리는 것부터 30분이 걸린다.
+```
+뭘 했는지 기억이 안 남
+    ↓
+회고를 쓰고 싶은데 시작이 막막함
+    ↓
+성장하고 있는지 체감이 안 됨
+    ↓
+열심히 하는데 쌓이는 느낌이 없음
+```
 
 **Grovarc의 답**: 매일 작업 로그를 짧게 기록하면 AI Agent가 패턴을 분석해서 회고 초안, 성장 리포트, 학습 로드맵을 자동으로 만들어준다. 기록은 사람이, 분석은 AI가.
 
 ---
 
-## 구조
+## 아키텍처
 
-단일 모노레포에 4개의 앱이 공존한다.
+```
+┌─────────────────────────────────────────────────────────────┐
+│            apps/web (Next.js + TypeScript)                   │
+│     작업 로그 입력 / 회고 대시보드 / 기술 성장 차트          │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ REST
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│            apps/api (Kotlin + Spring Boot)                    │
+│  사용자·로그 CRUD  │  JWT 인증  │  Kafka 이벤트 발행         │
+└──────────────┬───────────────────────────────────────────────┘
+               │ Kafka
+               ▼
+┌──────────────────────────────────────────────────────────────┐
+│            apps/ai (Python + FastAPI)                         │
+│                                                              │
+│  LangGraph Agent  │  LLaMA 3 추론  │  RAG (pgvector)        │
+│  ┌────────────┐   │  ┌───────────┐  │  ┌──────────────────┐ │
+│  │패턴 분석   │──>│  │회고 초안  │  │  │유사 문제 검색    │ │
+│  │기술 스택   │   │  │성장 리포트│  │  │(과거 로그 벡터화)│ │
+│  │감지        │   │  │로드맵 제안│  │  └──────────────────┘ │
+│  └────────────┘   │  └───────────┘  │                       │
+└──────────────────────────────────────────────────────────────┘
+               │
+┌──────────────▼───────────────────────────────────────────────┐
+│            apps/mcp (TypeScript MCP SDK)                      │
+│  Claude Desktop에서 직접 호출 가능한 MCP 서버                │
+│  - get_recent_logs: 최근 N일 로그 조회                       │
+│  - generate_retrospective: 기간 지정 회고 생성               │
+│  - search_similar_problems: 유사 문제 RAG 검색               │
+└──────────────────────────────────────────────────────────────┘
+
+infra/
+├── terraform/    # AWS EKS, RDS, ElastiCache, S3 IaC
+└── k8s/          # Deployment, Service, HPA 매니페스트
+```
+
+### 모노레포 구조
 
 ```
 grovarc/
 ├── apps/
-│   ├── web/    # Next.js — 작업 로그 기록, 회고 대시보드
-│   ├── api/    # Kotlin Spring Boot — REST API, 사용자/로그 관리
-│   ├── ai/     # Python FastAPI — LangGraph Agent, LLaMA 3 추론
-│   └── mcp/    # TypeScript MCP — Claude와 직접 연결되는 인터페이스
+│   ├── web/    # Next.js 프론트엔드
+│   ├── api/    # Kotlin Spring Boot 백엔드
+│   ├── ai/     # Python FastAPI AI 서버
+│   └── mcp/    # TypeScript MCP 서버
 ├── infra/
-│   ├── terraform/   # AWS 인프라 IaC
+│   ├── terraform/   # AWS 인프라 코드
 │   └── k8s/         # Kubernetes 매니페스트
 └── docs/
     ├── PRD.md
+    ├── architecture.md
     └── adr/         # 기술 결정 기록
 ```
+
+---
+
+## 핵심 기능 (MoSCoW)
+
+| 분류 | 기능 |
+|------|------|
+| **Must** | 작업 로그 입력 (한 일 / 막혔던 것 / 해결한 것) |
+| **Must** | AI 주간 회고 자동 생성 (매주 월요일) |
+| **Must** | 기술 성장 시각화 차트 |
+| **Should** | 유사 패턴 검색 (RAG) — "이전에 비슷한 문제 어떻게 해결했지?" |
+| **Should** | 성장 코칭 Agent — 부족한 기술 분석 + 학습 로드맵 제안 |
+| **Could** | 월간 리포트 공유 링크 |
+| **Could** | MCP 서버 — Cursor/Claude에서 직접 회고 데이터 조회 |
 
 ---
 
 ## 기술 선택 이유
 
 **Kotlin (api)**
-Java의 JVM 생태계와 Spring Boot 호환성을 유지하면서 코드를 간결하게 쓸 수 있다. 코루틴으로 AI 서버 응답 대기를 비동기 처리하기에도 자연스럽다. 익숙한 Spring 생태계를 유지하면서 새 언어를 프로덕션 수준으로 써보고 싶었다.
+JVM + Spring Boot 호환성을 유지하면서 코드를 간결하게 쓸 수 있다. 코루틴으로 AI 서버 응답 대기를 비동기 처리하기에도 자연스럽다. 익숙한 Spring 생태계를 유지하면서 새 언어를 프로덕션 수준으로 써보고 싶었다.
 
 **Python + FastAPI (ai)**
-LangGraph, LLaMA, RAG 생태계가 모두 Python에 있다. AI 서버만 Python으로 분리하고, 나머지는 Kotlin으로 유지하는 게 각 언어의 장점을 최대화하는 선택이었다.
+LangGraph, LLaMA, RAG 생태계가 모두 Python에 있다. AI 서버만 Python으로 분리하고 나머지는 Kotlin으로 유지하는 게 각 언어의 강점을 최대화한다.
 
-**LangGraph**
-단순 LLM 호출이 아니라 "패턴 분석 → 회고 초안 생성 → 로드맵 제안" 같은 복잡한 흐름이 필요하다. LangGraph는 이런 멀티 스텝 Agent 흐름을 그래프로 명확하게 표현할 수 있다.
+**LangGraph + LLaMA 3**
+단순 LLM 호출이 아니라 "패턴 분석 → 회고 초안 생성 → 로드맵 제안" 같은 멀티 스텝 흐름이 필요하다. LangGraph는 이 흐름을 상태 그래프로 명확하게 표현하고, 조건부 분기와 루프를 자연스럽게 다룰 수 있다.
+
+**pgvector + RAG**
+PostgreSQL에 pgvector 익스텐션을 더해 과거 작업 로그를 벡터화해 저장한다. "이전에 비슷한 문제를 어떻게 해결했지?"라는 검색을 코사인 유사도 기반으로 처리한다. 별도 벡터 DB 없이 기존 PostgreSQL에서 벡터 검색까지 처리해 운영 복잡성을 낮춘다.
 
 **MCP SDK**
-Claude Desktop과 직접 연결해서 사용자가 Claude에게 "지난 2주 동안 내가 뭘 배웠어?"라고 물으면 Grovarc 데이터를 기반으로 대답하게 만든다. 서비스를 열지 않아도 Claude 안에서 성장 데이터와 대화할 수 있다.
+Claude Desktop과 직접 연결해서, 사용자가 Cursor나 Claude에게 "지난 2주 동안 내가 뭘 배웠어?" "이번 달 가장 많이 다룬 기술이 뭐야?"라고 물으면 Grovarc 데이터를 기반으로 대답하게 만든다. 서비스를 열지 않아도 AI 도구 안에서 성장 데이터와 대화할 수 있다.
 
 **Kubernetes + Terraform**
-api, ai, mcp 각 앱을 독립 Deployment로 운영해 부하에 따라 개별 스케일 아웃이 가능하다. 인프라를 코드로 관리해 어떤 환경에서도 동일한 상태를 재현할 수 있다.
+api, ai, mcp 각 앱을 독립 Deployment로 운영해 부하에 따라 개별 스케일 아웃이 가능하다. ai 서버는 LLM 추론 부하가 크기 때문에 별도로 스케일할 수 있어야 한다. Terraform으로 AWS EKS, RDS, ElastiCache를 코드로 관리해 환경 재현성을 확보한다.
 
 ---
 
 ## 개발 방식
 
-Cursor Agent + Claude를 활용한 AI-assisted 개발(바이브코딩)로 진행한다. 코드를 직접 짜는 속도보다 **무엇을 왜 만드는지를 먼저 명확히 하는 것**에 더 집중한다.
+Cursor Agent + Claude를 활용한 AI-assisted 개발(바이브코딩)로 진행한다. 코드를 빠르게 짜는 것보다 **왜 만드는지, 무엇을 어떻게 만들지를 먼저 명확히 하는 것**에 집중한다.
 
-PRD 작성 → 아키텍처 문서 → ADR → 구현 순서를 지키고, 개발 과정은 [기술 블로그](/blog)에 기록한다.
+PRD → 아키텍처 문서 → ADR → 구현 순서를 지키고, 개발 과정은 [기술 블로그](/blog)에 기록한다.
 
 ---
 
-## 현재 단계
+## 비즈니스 모델
+
+| 플랜 | 가격 | 내용 |
+|------|------|------|
+| Free | 무료 | 로그 입력 + 기본 회고 월 4회 |
+| Pro | 월 9,900원 | 무제한 회고 + RAG 검색 + 성장 코칭 Agent |
+
+**KPI 목표** (런칭 3개월 기준): MAU 500명, 주 3회 이상 로그 작성 유저 40%, 회고 생성 후 수정율 60%+, D7 리텐션 30%
+
+---
+
+## 개발 단계
 
 | Phase | 내용 | 상태 |
 |-------|------|------|
 | Phase 0 | PRD & 아키텍처 설계 | 완료 |
 | Phase 1 | 인프라 & 로컬 환경 세팅 | 진행 중 |
-| Phase 2 | Kotlin API 코어 | 예정 |
+| Phase 2 | Kotlin API 코어 (로그 CRUD, 인증) | 예정 |
 | Phase 3 | LangGraph AI Agent 프로토타입 | 예정 |
-| Phase 4 | 프론트엔드 | 예정 |
-| Phase 5 | MCP 서버 연동 | 예정 |
-| Phase 6 | QA & 런칭 | 예정 |
+| Phase 4 | LLaMA 3 Fine-tuning | 예정 |
+| Phase 5 | Next.js 프론트엔드 | 예정 |
+| Phase 6 | MCP 서버 연동 | 예정 |
+| Phase 7 | PM 산출물 & 블로그 정리 | 예정 |
+| Phase 8 | QA & 런칭 | 예정 |
