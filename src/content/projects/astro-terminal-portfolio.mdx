@@ -1,0 +1,416 @@
+---
+title: "Astro Terminal Portfolio - 터미널 테마 포트폴리오 & 블로그"
+period: "2026.01 - 2026.03"
+role: "Solo Developer (Design + Frontend + DevOps)"
+stack: ["Astro v4", "TypeScript", "MDX", "CSS Variables", "GitHub Actions", "GitHub Pages"]
+links:
+  github: "https://github.com/projectmiluju/astro-terminal-portfolio-template"
+highlights:
+  - "Terminal/Hacker Aesthetic 디자인 시스템 전체 설계 (다크/라이트 테마)"
+  - "FOUC 없는 테마 전환 구현 (인라인 스크립트 + localStorage)"
+  - "Astro Content Collections 기반 블로그 + 프로젝트 케이스 스터디 구조 설계"
+  - "MIT 라이선스 공개 템플릿으로 배포"
+metrics:
+  - "솔로 개발 (디자인 · 개발 · 배포 전담)"
+  - "2개월 설계 및 개발 완료"
+  - "GitHub Pages 자동 배포 (GitHub Actions)"
+order: 6
+draft: false
+---
+
+## 아이디어
+
+개발자 포트폴리오를 만들 때 가장 흔한 선택지는 Notion, 노션 클론, 또는 Bootstrap 기반 템플릿이다. 그런데 이 방식들은 하나같이 비슷하게 생겼고, 개발자다운 느낌이 없다.
+
+```
+기존 포트폴리오의 문제
+    ↓
+템플릿 같은 느낌 → 개성 없음
+Notion 공유 링크 → 커스터마이징 한계
+외부 플랫폼 의존 → 데이터 통제권 없음
+    ↓
+해결책: 내가 직접 짠 사이트, 내 도메인, 내 디자인
+```
+
+**목표**: 터미널을 매일 보는 개발자가 자신의 작업 환경을 그대로 포트폴리오로 표현하는 것. 단순한 이력서가 아니라 기술 블로그와 프로젝트 케이스 스터디를 함께 담는 정적 사이트.
+
+이후 동일한 구조를 MIT 라이선스로 공개해 누구나 자신만의 터미널 포트폴리오를 만들 수 있는 템플릿으로 배포했다.
+
+---
+
+## 아키텍처
+
+```
+src/
+├── components/          # 재사용 Astro 컴포넌트
+│   ├── Header.astro     # 네비게이션 + 테마 토글
+│   ├── Footer.astro
+│   ├── BlogCard.astro   # 포스트 카드
+│   └── ProjectCard.astro
+├── config/
+│   └── site.ts          # 사이트 메타, 카테고리, 시리즈 설정
+├── content/
+│   ├── config.ts        # Content Collections 스키마
+│   ├── blog/
+│   │   ├── cs/          # CS 개념 정리
+│   │   ├── books/       # 개발 서적 리뷰
+│   │   └── til/         # TIL / 문제 해결
+│   └── projects/        # 프로젝트 케이스 스터디
+├── layouts/
+│   └── BaseLayout.astro # 공통 레이아웃 + 테마 스크립트
+├── pages/               # 파일 기반 라우팅
+│   ├── index.astro      # 홈
+│   ├── blog/
+│   │   ├── index.astro  # 블로그 목록 (카테고리 필터)
+│   │   └── [...slug].astro
+│   └── projects/
+│       ├── index.astro
+│       └── [...slug].astro
+└── styles/
+    └── global.css       # CSS Variables + 글로벌 스타일
+```
+
+### 빌드 & 배포
+
+```
+로컬 편집 (MDX 작성)
+    ↓
+git push → main 브랜치
+    ↓
+GitHub Actions 트리거
+    ↓
+npm run build → dist/ 생성
+    ↓
+GitHub Pages 배포 (정적 호스팅)
+```
+
+---
+
+## 핵심 구현
+
+### 1. 다크/라이트 테마 시스템 (FOUC 방지)
+
+테마 전환에서 가장 까다로운 문제는 **FOUC(Flash of Unstyled Content)** 다. 페이지 로드 시 JavaScript가 실행되기 전에 기본 스타일이 잠깐 보이는 현상인데, `localStorage`에 저장된 테마를 읽기 전에 화면이 렌더링되면 발생한다.
+
+```html
+<!-- BaseLayout.astro <head> 인라인 스크립트 — 번들 JS보다 먼저 실행 -->
+<script is:inline>
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved ?? (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+</script>
+```
+
+`is:inline` 속성으로 Astro 번들링을 우회해 HTML 파싱 즉시 실행되도록 했다. 덕분에 첫 렌더링 전에 `data-theme`가 설정되어 FOUC가 완전히 사라진다.
+
+테마 전환 자체는 CSS Variables로 처리한다:
+
+```css
+/* global.css */
+:root[data-theme="dark"] {
+  --color-bg: #0d0d0d;
+  --color-bg-alt: #111111;
+  --color-text: #c8c8c8;
+  --color-text-bright: #e8e8e8;
+  --color-accent: #00ff41;        /* 매트릭스 그린 */
+  --color-prompt-path: #00b4d8;   /* 청록 */
+}
+
+:root[data-theme="light"] {
+  --color-bg: #f0f0ec;
+  --color-bg-alt: #e8e8e4;
+  --color-text: #2a2a2a;
+  --color-text-bright: #0a0a0a;
+  --color-accent: #007a1e;        /* 다크 그린 */
+  --color-prompt-path: #006b8f;
+}
+
+/* flex 재정의 방지 — hidden 속성이 덮어씌워지는 버그 차단 */
+[hidden] { display: none !important; }
+```
+
+### 2. Content Collections 스키마
+
+Astro의 `Content Collections`로 블로그 포스트와 프로젝트를 타입 안전하게 관리한다:
+
+```typescript
+// src/content/config.ts
+import { defineCollection, z } from 'astro:content';
+
+const blog = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    date: z.date(),
+    summary: z.string(),
+    tags: z.array(z.string()).default([]),
+    category: z.enum(['cs', 'book', 'til']),
+    series: z.string().optional(),
+    cover: z.string().optional(),
+    draft: z.boolean().default(false),
+  }),
+});
+
+const projects = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    period: z.string(),
+    role: z.string(),
+    stack: z.array(z.string()),
+    links: z.object({
+      github: z.string().optional(),
+      live: z.string().optional(),
+    }).optional(),
+    highlights: z.array(z.string()).default([]),
+    metrics: z.array(z.string()).default([]),
+    youtube: z.string().optional(),
+    order: z.number(),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { blog, projects };
+```
+
+빌드 시 스키마 검증이 실행되므로 오탈자나 필드 누락이 있으면 `npm run build`에서 즉시 오류가 난다. 런타임이 아닌 빌드 타임에 콘텐츠 오류를 잡는 구조다.
+
+### 3. 터미널 디자인 시스템
+
+모든 UI 요소를 터미널 프롬프트 스타일로 통일한다. 카드 컴포넌트는 macOS 창 타이틀바를 흉내 낸 도트 버튼에서 시작해 `$ command` 형식의 헤더로 이어진다:
+
+```astro
+<!-- ProjectCard.astro -->
+<article class="project-card">
+  <!-- macOS 도트 (빨/노/초) -->
+  <div class="card-titlebar">
+    <span class="dot dot-red"></span>
+    <span class="dot dot-yellow"></span>
+    <span class="dot dot-green"></span>
+    <span class="card-title">$ cat {slug}.md</span>
+  </div>
+
+  <!-- 터미널 프롬프트 형식 헤더 -->
+  <div class="card-header">
+    <span class="prompt">
+      <span class="prompt-user">user</span>
+      <span class="prompt-at">@</span>
+      <span class="prompt-host">dev</span>
+      <span class="prompt-colon">:</span>
+      <span class="prompt-path">~/projects</span>
+      <span class="prompt-dollar">$</span>
+    </span>
+    <span class="prompt-cmd">open {title}</span>
+  </div>
+
+  <div class="card-body">
+    <!-- 콘텐츠 -->
+  </div>
+
+  <!-- 대괄호 버튼 스타일 -->
+  <a href={`/projects/${slug}`} class="btn-terminal">[→ open]</a>
+  {github && <a href={github} class="btn-terminal">[gh]</a>}
+</article>
+```
+
+```css
+.prompt-user  { color: var(--color-accent); }
+.prompt-path  { color: var(--color-prompt-path); }
+.prompt-dollar { color: var(--color-accent); }
+
+.btn-terminal {
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  transition: background 0.15s;
+}
+.btn-terminal:hover {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+```
+
+### 4. GitHub Actions 자동 배포
+
+`main` 브랜치에 push하면 빌드와 배포가 자동으로 실행된다:
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - uses: actions/deploy-pages@v4
+```
+
+`public/.nojekyll` 파일을 포함시켜 GitHub Pages의 Jekyll 처리를 비활성화했다. Astro 빌드 결과물에 언더스코어 접두사 파일(`_astro/`)이 있는데 Jekyll이 이를 무시하기 때문에 필수 설정이다.
+
+---
+
+## 트러블슈팅
+
+### 이슈 1: 테마 토글 후 페이지 이동 시 FOUC 재발
+
+**현상**: 테마를 라이트로 바꾼 뒤 다른 페이지로 이동하면 다크 테마가 잠깐 깜빡이다가 라이트로 바뀜
+
+**원인**: Astro의 클라이언트 사이드 라우팅(View Transitions)과 인라인 스크립트 실행 타이밍 충돌. 페이지 전환 시 `<head>`가 재실행되지 않음
+
+**해결**: `astro:after-swap` 이벤트를 활용해 페이지 전환 직후에도 테마를 재적용
+
+```javascript
+// BaseLayout.astro
+document.addEventListener('astro:after-swap', () => {
+  const theme = localStorage.getItem('theme') ?? 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+});
+```
+
+**결과**: 페이지 이동 시에도 테마가 깜빡임 없이 유지됨
+
+---
+
+### 이슈 2: MDX 코드 블록 스타일이 테마에 반응하지 않음
+
+**현상**: 다크↔라이트 전환 시 코드 블록 배경색이 테마를 따라오지 않고 고정됨
+
+**원인**: Astro의 기본 코드 하이라이터(Shiki)가 빌드 타임에 인라인 스타일을 직접 주입하는 방식이라 CSS Variables로 제어 불가
+
+**해결**: Shiki 테마를 `css-variables` 모드로 설정하고 CSS Variables에 직접 매핑
+
+```javascript
+// astro.config.mjs
+export default defineConfig({
+  markdown: {
+    shikiConfig: {
+      theme: 'css-variables',
+    },
+  },
+});
+```
+
+```css
+/* global.css — Shiki css-variables 매핑 */
+:root[data-theme="dark"] {
+  --astro-code-color-text: #c8c8c8;
+  --astro-code-color-background: #111111;
+  --astro-code-token-keyword: #00ff41;
+  --astro-code-token-string: #98c379;
+  --astro-code-token-comment: #5c6370;
+  --astro-code-token-function: #61afef;
+}
+
+:root[data-theme="light"] {
+  --astro-code-color-text: #2a2a2a;
+  --astro-code-color-background: #e0e0dc;
+  --astro-code-token-keyword: #007a1e;
+  --astro-code-token-string: #2e7d32;
+  --astro-code-token-comment: #8a8a8a;
+  --astro-code-token-function: #0055a4;
+}
+```
+
+**결과**: 코드 블록도 테마 전환에 즉시 반응
+
+---
+
+### 이슈 3: `[hidden]` 속성이 flex 레이아웃에서 무시됨
+
+**현상**: 필터 패널 등 `hidden` 속성으로 숨긴 요소가 flex 컨테이너 안에서 여전히 공간을 차지함
+
+**원인**: 일부 CSS 규칙에서 `display: flex`가 `[hidden]`의 `display: none`을 덮어씌움
+
+**해결**: `!important` 우선순위 강제 적용
+
+```css
+[hidden] { display: none !important; }
+```
+
+단순하지만 flex/grid 컨텍스트에서 `hidden` 속성 신뢰성을 보장하는 필수 규칙이다.
+
+---
+
+## 공개 템플릿화
+
+개인 포트폴리오를 완성한 뒤, 콘텐츠(포스트, 프로젝트 데이터)를 모두 샘플 더미 데이터로 교체하고 MIT 라이선스를 달아 퍼블릭 템플릿으로 공개했다.
+
+```
+astro-terminal-portfolio-template/
+├── src/content/
+│   ├── blog/        # 샘플 포스트 (cs/book/til 각 1개)
+│   └── projects/    # 샘플 프로젝트 3개
+├── src/config/
+│   └── site.ts      # ← 이 파일만 수정하면 사이트 커스터마이징 완료
+├── LICENSE          # MIT
+└── README.md        # 빠른 시작 가이드
+```
+
+`site.ts` 하나만 수정하면 이름, 링크, 카테고리, 강점 섹션이 전부 바뀌도록 설계해 포크 후 바로 쓸 수 있게 만들었다.
+
+---
+
+## 성과
+
+| 지표 | 결과 |
+|------|------|
+| 개발 기간 | 2개월 (설계 ~ 배포) |
+| 담당 범위 | 디자인 · 개발 · 배포 전체 |
+| 콘텐츠 구조 | 블로그(cs/book/til) + 프로젝트 케이스 스터디 |
+| 배포 방식 | GitHub Actions 자동 배포 |
+| 라이선스 | MIT (공개 템플릿) |
+
+---
+
+## 주요 기능
+
+- **터미널 디자인 시스템**: macOS 도트 타이틀바, `user@dev:~/path$` 프롬프트, 대괄호 버튼 스타일
+- **다크/라이트 테마**: FOUC 없는 즉시 전환, `localStorage` 기반 유지
+- **블로그**: MDX 기반 포스트, 카테고리/태그 필터, 시리즈 지원
+- **프로젝트 케이스 스터디**: 아키텍처 · 핵심 구현 · 트러블슈팅 상세 기록
+- **자동 배포**: `git push` 한 번으로 GitHub Pages 반영
+- **공개 템플릿**: MIT 라이선스, 포크 후 `site.ts` 수정만으로 커스터마이징
+
+---
+
+## 회고
+
+### 잘한 점
+- 디자인 컨셉을 처음부터 끝까지 일관되게 유지
+- FOUC 같은 사용자 경험에 직접 영향을 미치는 문제를 근본적으로 해결
+- 단순히 포트폴리오를 만드는 데 그치지 않고 재사용 가능한 공개 템플릿으로 발전시킴
+
+### 개선할 점
+- 검색 기능 부재 (블로그 포스트가 많아질수록 필요)
+- RSS 피드 미구현
+- 모바일 터미널 UI 최적화 여지
+
+### 다음 개선 계획
+- Pagefind 기반 정적 검색 도입
+- RSS 피드 자동 생성
+- OG 이미지 자동 생성 (포스트별)
