@@ -75,6 +75,7 @@
 그래서 저장소 전체에 `MIT` 라이선스를 적용하지 않았습니다.
 
 사이트 구현 코드만 별도로 공개하려면 새 저장소를 만들고 그 저장소에 `MIT`를 적용하는 방식을 권장합니다.  
+공개용 템플릿 레포는 [astro-terminal-portfolio-template](https://github.com/projectmiluju/astro-terminal-portfolio-template) 에서 확인할 수 있습니다.  
 분리 기준은 `docs/source-code-repo-licensing.md` 에 정리되어 있습니다.
 
 ## Stack
