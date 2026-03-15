@@ -59,7 +59,7 @@ const postsData = allPosts.slice(0, 8).map(p => ({
             <span class="t-cmd" id="t-cmd-1"></span>
           </div>
           <div class="t-output-block" id="t-out-1" hidden>
-            <p class="t-out t-out-bright">Backend/Infra 중심 풀스택 엔지니어</p>
+            <p class="t-out t-out-bright">풀스택 엔지니어 · AI 프로덕트 빌더</p>
           </div>
 
           <!-- Line 2: cat profile.txt -->
@@ -70,8 +70,8 @@ const postsData = allPosts.slice(0, 8).map(p => ({
             <span class="t-cmd" id="t-cmd-2"></span>
           </div>
           <div class="t-output-block" id="t-out-2" hidden>
-            <p class="t-out">신뢰할 수 있는 시스템 설계와 자동화를 추구합니다.</p>
-            <p class="t-out">복잡한 문제를 단순하게 해결하고, 팀의 생산성을 높이는 일에 집중합니다.</p>
+            <p class="t-out">백엔드/인프라에 뿌리를 두고, AI 통합부터 프론트엔드까지 혼자 설계합니다.</p>
+            <p class="t-out">복잡한 시스템을 처음부터 끝까지 직접 만들어야 제대로 이해한다고 믿습니다.</p>
           </div>
 
           <!-- Line 3: ls skills/ -->
@@ -82,16 +82,23 @@ const postsData = allPosts.slice(0, 8).map(p => ({
             <span class="t-cmd" id="t-cmd-3"></span>
           </div>
           <div class="t-output-block t-skills" id="t-out-3" hidden>
+            <span class="t-skill">Kotlin</span>
+            <span class="t-skill">Spring Boot</span>
             <span class="t-skill">Java</span>
-            <span class="t-skill">Spring</span>
+            <span class="t-skill">Python</span>
+            <span class="t-skill">FastAPI</span>
+            <span class="t-skill">LangGraph</span>
+            <span class="t-skill">RAG</span>
+            <span class="t-skill">Next.js</span>
+            <span class="t-skill">React</span>
+            <span class="t-skill">TypeScript</span>
             <span class="t-skill">AWS</span>
-            <span class="t-skill">Docker</span>
             <span class="t-skill">Kubernetes</span>
+            <span class="t-skill">Terraform</span>
+            <span class="t-skill">Docker</span>
             <span class="t-skill">PostgreSQL</span>
             <span class="t-skill">Redis</span>
-            <span class="t-skill">Terraform</span>
-            <span class="t-skill">Python</span>
-            <span class="t-skill">React</span>
+            <span class="t-skill">Kafka</span>
           </div>
 
           <!-- Interactive input line (shown after typewriter) -->
@@ -334,9 +341,9 @@ const postsData = allPosts.slice(0, 8).map(p => ({
       // ── whoami ──
       if (main === 'whoami') {
         appendOutput([
-          { text: 'Backend/Infra 중심 풀스택 엔지니어', bright: true },
-          { text: '신뢰할 수 있는 시스템 설계와 자동화를 추구합니다.' },
-          { text: '복잡한 문제를 단순하게 해결하고, 팀의 생산성을 높이는 일에 집중합니다.' },
+          { text: '풀스택 엔지니어 · AI 프로덕트 빌더', bright: true },
+          { text: '백엔드/인프라에 뿌리를 두고, AI 통합부터 프론트엔드까지 혼자 설계합니다.' },
+          { text: '복잡한 시스템을 처음부터 끝까지 직접 만들어야 제대로 이해한다고 믿습니다.' },
         ]);
         return;
       }
@@ -356,7 +363,7 @@ const postsData = allPosts.slice(0, 8).map(p => ({
 
       // ── ls skills/ ──
       if (lower === 'ls skills/' || lower === 'ls skills' || lower === 'skills') {
-        appendSkills(['Java','Spring Boot','AWS','Docker','Kubernetes','PostgreSQL','Redis','Terraform','Python','React','TypeScript','Kafka','GitHub Actions','Linux']);
+        appendSkills(['Kotlin','Spring Boot','Java','Python','FastAPI','LangGraph','RAG','Next.js','React','TypeScript','AWS','Kubernetes','Terraform','Docker','PostgreSQL','Redis','Kafka','GitHub Actions','Linux']);
         return;
       }
 
@@ -396,9 +403,9 @@ const postsData = allPosts.slice(0, 8).map(p => ({
       if (lower === 'cat about.txt' || lower === 'about') {
         appendOutput([
           { html: `<span style="color:var(--color-text-muted)"># about.txt</span>` },
-          { html: `<span style="color:var(--color-text-bright)">Backend/Infra 중심 풀스택 엔지니어</span>` },
-          { text: '신뢰성 있는 시스템 설계, 성능 최적화, 자동화된 인프라 구축을 추구합니다.' },
-          { text: '시스템 안정성과 팀의 개발 생산성을 함께 높이는 것이 목표입니다.' },
+          { html: `<span style="color:var(--color-text-bright)">풀스택 엔지니어 · AI 프로덕트 빌더</span>` },
+          { text: '백엔드/인프라에 뿌리를 두고, AI 통합부터 프론트엔드까지 혼자 설계합니다.' },
+          { text: 'LangGraph AI Agent, Yjs 실시간 협업, K8s+Terraform IaC — 복잡한 시스템을 처음부터 끝까지 직접 만듭니다.' },
         ]);
         return;
       }
@@ -519,9 +526,9 @@ const postsData = allPosts.slice(0, 8).map(p => ({
 
       if (lower === 'cat profile.txt') {
         appendOutput([
-          { text: 'Backend/Infra 중심 풀스택 엔지니어', bright: true },
-          { text: '신뢰할 수 있는 시스템 설계와 자동화를 추구합니다.' },
-          { text: '복잡한 문제를 단순하게 해결하고, 팀의 생산성을 높이는 일에 집중합니다.' },
+          { text: '풀스택 엔지니어 · AI 프로덕트 빌더', bright: true },
+          { text: '백엔드/인프라에 뿌리를 두고, AI 통합부터 프론트엔드까지 혼자 설계합니다.' },
+          { text: '복잡한 시스템을 처음부터 끝까지 직접 만들어야 제대로 이해한다고 믿습니다.' },
         ]);
         return;
       }

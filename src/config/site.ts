@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: 'projectmiluju',
-  title: 'projectmiluju | Backend/Infra 중심 풀스택 엔지니어',
-  description: '백엔드/인프라 중심의 풀스택 엔지니어. 신뢰성 있는 시스템 설계, 성능 최적화, 자동화된 인프라 구축을 추구합니다.',
+  title: 'projectmiluju | 풀스택 엔지니어 · AI 프로덕트 빌더',
+  description: '백엔드/인프라에 뿌리를 두고, AI 통합부터 프론트엔드까지 혼자 설계하는 풀스택 엔지니어. LangGraph AI Agent, Yjs 실시간 협업, Kubernetes IaC — 복잡한 시스템을 처음부터 끝까지 직접 만듭니다.',
   url: 'https://projectmiluju.github.io',
   author: {
     name: 'projectmiluju',
@@ -16,22 +16,22 @@ export const siteConfig = {
   // 홈 페이지 강점 섹션
   strengths: [
     {
-      title: '신뢰성',
-      description: 'Docker 샌드박스, JWT 인증, 동시성 제어 등 안전하고 안정적인 시스템을 설계합니다.',
-      icon: 'shield',
-      evidence: 'DeepWebIDE - Docker 격리 환경 구현, DDOK - 비관적 락 기반 동시성 처리',
+      title: 'AI 통합',
+      description: 'LLM을 실제 서비스 데이터와 연결합니다. LangGraph Agent 파이프라인, pgvector RAG, MCP SDK로 AI를 도구가 아닌 기능으로 만듭니다.',
+      icon: 'cpu',
+      evidence: 'Grovarc - LangGraph+LLaMA3 회고 생성 Agent, RAG 유사 문제 검색, Claude 연동 MCP 서버',
     },
     {
-      title: '성능',
-      description: 'Redis 캐싱, N+1 해결, 실시간 동기화 최적화로 빠른 사용자 경험을 제공합니다.',
+      title: '시스템 설계',
+      description: '규모가 커져도 흔들리지 않는 구조를 설계합니다. MSA 오케스트레이터 패턴, Yjs 협업 프로토콜 직접 구현, K8s+Terraform IaC.',
+      icon: 'layers',
+      evidence: 'CastCanvas Lab - 5레포 MSA + Yjs 프로토콜 직접 설계, Grovarc - K8s+Terraform IaC 인프라',
+    },
+    {
+      title: '성능 & 신뢰성',
+      description: 'TanStack Query 계층적 캐시 설계, Yjs state-vector delta 동기화, 비관적 락 동시성 처리로 빠르고 안정적인 서비스를 만듭니다.',
       icon: 'zap',
-      evidence: '쓱관 - 랭킹 조회 3초→50ms, DDOK - 프로젝트 조회 2초→200ms',
-    },
-    {
-      title: '자동화',
-      description: 'GitHub Actions CI/CD, AWS 인프라 구축으로 배포 자동화와 운영 효율을 높입니다.',
-      icon: 'cog',
-      evidence: '4개 프로젝트 모두 GitHub Actions 기반 자동 배포 파이프라인 구축',
+      evidence: 'TripPixel - useQueries 병렬 조회 + 캐시 invalidation 설계, DDOK - 조회 2초→200ms + 비관적 락, CastCanvas - Yjs delta 동기화',
     },
   ],
   // 블로그 카테고리

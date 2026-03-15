@@ -2,7 +2,7 @@
 interface Props {
   title: string;
   description: string;
-  icon: 'shield' | 'zap' | 'cog';
+  icon: 'shield' | 'zap' | 'cog' | 'cpu' | 'layers';
   evidence?: string;
 }
 
@@ -12,6 +12,8 @@ const iconMap = {
   shield: '[RELIABILITY]',
   zap: '[PERFORMANCE]',
   cog: '[AUTOMATION]',
+  cpu: '[AI_INTEGRATION]',
+  layers: '[SYSTEM_DESIGN]',
 };
 
 const statusLabel = iconMap[icon] || `[${icon.toUpperCase()}]`;
