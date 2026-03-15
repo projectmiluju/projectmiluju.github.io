@@ -1,0 +1,244 @@
+---
+title: "TripPixel - AI 기반 여행 플래닝 플랫폼"
+period: "2025.11 - 2026.03"
+role: "Frontend Developer"
+stack: ["Next.js", "TypeScript", "TanStack Query", "Google Maps API", "Tailwind CSS", "shadcn/ui", "Axios", "date-fns"]
+links:
+  github: "https://github.com/projectmiluju/waypoint-fe-v2"
+  demo: "https://trip-pixel.com/"
+highlights:
+  - "YouTube 영상 AI 분석으로 여행 장소 자동 추출 기능 구현"
+  - "Google Maps 기반 후보지 선택 및 CandidatePin 오버레이 개발"
+  - "여행 멤버 투표 및 장소 의견 공유 시스템 구현"
+  - "일정 플래닝 및 예산 관리 UI 개발"
+metrics:
+  - "9명 팀 프로젝트 (PM 1, 디자이너 2, BE 3, FE 3)"
+  - "5개월 기획 ~ 개발 완료"
+  - "실서비스 배포 (trip-pixel.com)"
+order: 3
+draft: false
+---
+
+## 문제 정의
+
+여행을 함께 계획할 때 겪는 어려움:
+- 유튜브 여행 영상을 보며 장소를 메모하지만, 이를 일정에 반영하기까지 번거로운 과정
+- 여러 멤버가 각자 원하는 장소를 공유하고 의견을 모으는 도구 부재
+- 일정, 예산, 멤버 합의를 한 곳에서 처리할 수 있는 통합 플랫폼 없음
+
+**목표**: YouTube AI 분석 → 장소 추출 → 일정 구성 → 멤버 투표까지, 여행 플래닝 전 과정을 하나의 플랫폼에서 해결
+
+## 역할과 범위
+
+**역할**: 프론트엔드 개발자 (FE 3인 중 1인)
+**범위**:
+- 후보지 선택 페이지 및 Google Maps 연동
+- 장소 검색 탭 및 보관함 기능
+- 플랜 상세 페이지 (scrollspy, 일정 뷰)
+- 공통 UI 컴포넌트 개발
+
+---
+
+## 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Frontend (Next.js App Router)                │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Plan Page  │  │ Candidate    │  │   Member     │      │
+│  │  (일정/예산) │  │  Selection   │  │   Voting     │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │     TanStack Query (서버 상태 관리 + 캐싱)            │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌───────────────────┐   ┌────────────────────────────┐    │
+│  │  Google Maps API  │   │  shadcn/ui + Tailwind CSS   │   │
+│  │  (후보지 핀/지도) │   │  (공통 컴포넌트 시스템)     │   │
+│  └───────────────────┘   └────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ REST API (Axios)
+                    ┌─────────────────┐
+                    │   Backend (BE)  │
+                    │  AI 장소 추출   │
+                    │  일정/예산 API  │
+                    │  투표/의견 API  │
+                    └─────────────────┘
+```
+
+---
+
+## 핵심 구현
+
+### 1. YouTube AI 장소 추출
+
+YouTube URL을 입력하면 BE의 AI 파이프라인이 영상 자막/정보를 분석해 여행 장소 목록을 반환. FE는 결과를 수신하여 지도와 목록 UI에 표시:
+
+```typescript
+// YouTube URL 기반 장소 추출 요청
+const useExtractPlaces = () => {
+  return useMutation({
+    mutationFn: async (youtubeUrl: string) => {
+      const { data } = await axios.post('/api/places/extract', { youtubeUrl });
+      return data;
+    },
+    onSuccess: (places) => {
+      queryClient.setQueryData(['extracted-places'], places);
+    },
+  });
+};
+```
+
+### 2. Google Maps 후보지 선택
+
+지도 위에 후보지를 CandidatePin 오버레이로 표시하고, 선택 시 fitBounds로 해당 위치로 자동 이동:
+
+```typescript
+// 후보지 핀 오버레이 및 지도 자동 맞춤
+const CandidateMapView = ({ candidates }: { candidates: Candidate[] }) => {
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || candidates.length === 0) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    candidates.forEach((c) => {
+      bounds.extend({ lat: c.lat, lng: c.lng });
+    });
+    mapRef.current.fitBounds(bounds);
+  }, [candidates]);
+
+  return (
+    <GoogleMap onLoad={(map) => (mapRef.current = map)}>
+      {candidates.map((c) => (
+        <CandidatePin key={c.id} position={{ lat: c.lat, lng: c.lng }} candidate={c} />
+      ))}
+    </GoogleMap>
+  );
+};
+```
+
+### 3. 멤버 투표 및 의견 시스템
+
+여행 멤버가 각 장소에 투표하고 의견을 남길 수 있는 협업 기능:
+
+```typescript
+// 장소 투표
+const usePlaceVote = (placeId: string) => {
+  return useMutation({
+    mutationFn: (vote: 'up' | 'down') =>
+      axios.post(`/api/places/${placeId}/vote`, { vote }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['place', placeId] });
+    },
+  });
+};
+```
+
+### 4. 플랜 상세 — Scrollspy
+
+플랜 상세 페이지에서 날짜별 일정을 scrollspy로 연동해 현재 위치 하이라이팅:
+
+```typescript
+// scrollspy로 현재 섹션 추적
+const usePlanScrollspy = (dayIds: string[]) => {
+  const [activeDay, setActiveDay] = useState(dayIds[0]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) setActiveDay(entry.target.id);
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    dayIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [dayIds]);
+
+  return { activeDay };
+};
+```
+
+---
+
+## 트러블슈팅
+
+### 이슈 1: 장소 검색 탭에서 보관함 없어도 버튼 활성화
+
+**현상**: 보관함(저장된 장소)이 없는 경우에도 특정 버튼이 활성화되어 사용자 혼란
+
+**원인**: 버튼 활성화 조건이 보관함 유무를 체크하지 않고 단순 탭 상태로만 판단
+
+**해결**: 보관함 데이터 유무를 조건으로 추가하여 버튼 활성화 로직 수정
+
+```typescript
+const isButtonEnabled = selectedTab === 'search' || bookmarks.length > 0;
+```
+
+---
+
+### 이슈 2: 후보지 선택 후 플랜 상세로 이동 시 데이터 동기화
+
+**현상**: 후보지 선택 완료 후 플랜 상세 페이지 이동 시 변경사항이 즉시 반영되지 않음
+
+**원인**: TanStack Query 캐시가 무효화되지 않아 이전 데이터 표시
+
+**해결**: 후보지 선택 mutation 성공 시 관련 쿼리 invalidation 처리
+
+```typescript
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ['plan', planId] });
+  queryClient.invalidateQueries({ queryKey: ['candidates', planId] });
+  router.push(`/plans/${planId}`);
+}
+```
+
+---
+
+## 성과
+
+| 지표 | 결과 |
+|------|------|
+| 개발 기간 | 5개월 (기획 ~ 배포) |
+| 팀 구성 | 9명 (PM 1, 디자이너 2, BE 3, FE 3) |
+| 서비스 배포 | trip-pixel.com 실서비스 운영 |
+| 담당 기능 | 후보지 선택, 장소 검색, 플랜 상세 |
+
+---
+
+## 주요 기능
+
+- **YouTube AI 추출**: 유튜브 영상 URL 입력 → AI가 여행 장소 자동 추출 및 지도에 표시
+- **일정 플래닝**: 날짜별 장소 배치, scrollspy 기반 플랜 상세 뷰
+- **예산 관리**: 여행 전체 예산 설정 및 항목별 비용 분배
+- **멤버 협업**: 여행 멤버 초대, 장소별 투표 및 의견 남기기
+- **보관함**: 마음에 드는 장소 저장 후 일정에 추가
+
+---
+
+## 회고 및 다음 개선
+
+### 잘한 점
+- TanStack Query로 서버 상태와 캐싱 일관성 있게 관리
+- Google Maps API와 UI 컴포넌트 분리로 유지보수성 확보
+- 팀 컨벤션(WAPO 티켓 기반 커밋) 준수
+
+### 개선할 점
+- 구글 맵 초기 로딩 최적화 (지도 렌더링 지연)
+- 투표 결과 실시간 반영 (현재 폴링 기반)
+- 모바일 최적화 미흡
+
+### 다음 개선 계획
+- WebSocket 기반 실시간 투표 반영
+- 여행 일정 공유 링크 기능
+- 모바일 반응형 강화
