@@ -1,0 +1,75 @@
+---
+title: "CastCanvas Lab: 전역 개발자 경험(DX) 향상 및 협업 인프라 구축"
+date: 2026-03-16
+summary: "프로젝트 전반에 걸쳐 GitHub 템플릿, Husky 훅, ESLint/Prettier 표준을 도입하여 일관된 코드 품질과 협업 환경을 구축하고, FE의 Custom Edge 로직 및 BE의 로컬 인프라를 세팅했다."
+tags: ["DX", "CI/CD", "ESLint", "Husky", "Docker Compose", "React Flow"]
+category: "til"
+series: "CastCanvas Lab 개발기"
+---
+
+# CastCanvas Lab: 전역 개발자 경험(DX) 향상 및 협업 인프라 구축
+
+프로젝트가 4개의 다중 모듈(BE, FE, Collab, Site)로 구성됨에 따라, 팀원 간의 협업 효율성과 코드 품질을 일관되게 유지하기 위한 전역적인 인프라 설정이 필요했다. 이번 TIL에서는 Husky, commitlint, ESLint/Prettier를 활용한 프론트엔드 생태계의 표준화와 백엔드의 로컬 개발 환경 구성, 그리고 캔버스의 커스텀 엣지 기능을 다룬다.
+
+---
+
+## 목표
+
+- **코드 컨벤션 및 린팅 통일**: 다수의 프론트엔드 모듈(FE, Collab, Site)에서 발생하는 컨벤션 파편화를 방지.
+- **안전한 협업 프로세스 보장**: 커밋 메시지 규약(commitlint) 및 브랜치 명명 규칙 강제화.
+- **백엔드 로컬 인프라 자동화**: Docker Compose를 활용하여 DB 및 마이그레이션(Flyway)을 한 번에 세팅.
+- **FE 캔버스 고도화**: 사용자 정의 엣지(Custom Edge)의 생성 및 삭제 로직을 캔버스 상태에 통합.
+
+---
+
+## 핵심 구현 포인트
+
+### 1) ESLint & Prettier 기반 린팅 체계 통합 (FE, Collab, Site)
+
+기존에 모듈별로 혼용되던 포매터(Collab의 Biome 등)를 ESLint와 Prettier 조합으로 완전히 전환했다. 이를 통해 `eslint.config.js`와 `.prettierrc`를 기준으로 일관된 규칙을 적용하고 충돌을 해소했다.
+
+- **Collab**: Biome에서 ESLint/Prettier로 마이그레이션.
+- **FE & Site**: Prettier 설정을 추가하고 ESLint 충돌 설정을 정리.
+
+### 2) Husky 훅과 commitlint를 통한 사전 검증 (Collab, Site)
+
+커밋이나 푸시를 수행하기 전 자동으로 코드 상태를 검증하고, 브랜치명 및 커밋 메시지 정책을 강제하는 스크립트를 적용했다.
+
+- **pre-push & pre-commit 훅**: 린트 에러를 방지하고 시크릿 키가 푸시되는 것을 차단.
+- **commitlint**: Angular 커밋 컨벤션을 강제하여 히스토리 가독성 향상.
+- **템플릿 적용**: 모든 레포지토리에 GitHub Issue 및 PR 템플릿을 추가하여 리뷰 프로세스 규격화.
+
+### 3) BE 로컬 개발 인프라 세팅 (BE)
+
+백엔드 개발의 진입 장벽을 낮추기 위해 `docker-compose.yml`을 추가하여 PostgreSQL 데이터베이스와 필수 인프라를 컨테이너화했다. 또한, Flyway를 활용한 스키마 마이그레이션 초기 설정을 구성하여 로컬에서 일관된 DB 상태를 유지할 수 있도록 했다.
+
+### 4) Canvas Custom Edge 로직 통합 (FE)
+
+React Flow 기반의 캔버스에서 노드 간 연결선(Edge)을 생성하고 삭제하는 로직을 고도화했다.
+- **edgeTypes 적용**: 기본 엣지 대신 스타일링과 상호작용이 가능한 커스텀 엣지를 `Canvas` 컴포넌트에 등록.
+- **canvasStore 통합**: 엣지 생성 로직을 Zustand 스토어로 관리하여 상태 추적성을 높임.
+
+---
+
+## 트러블슈팅 / 고민 포인트
+
+### 다중 모듈 환경에서의 포매터 충돌
+
+- **원인**: 여러 레포지토리에서 각각 다른 포매팅 도구(Biome vs Prettier)를 사용하면서 IDE 설정(VSCode/WebStorm)에서 저장 시 충돌이 발생했다.
+- **해결**: 모든 Node.js/TypeScript 기반 모듈(FE, Collab, Site)의 코드 품질 도구를 ESLint + Prettier 스택으로 단일화하고, 루트 수준의 작업 지침을 정립하여 도구 파편화를 해결했다.
+
+---
+
+## 결과
+
+- **자동화된 코드 리뷰**: 로컬 훅(Husky)을 통해 린트 에러가 포함된 커밋을 사전에 차단.
+- **통합된 문서화 환경**: 각 모듈의 README가 업데이트되고 이슈 템플릿이 통일되어 온보딩 비용 감소.
+- **안정적인 캔버스 상호작용**: 사용자가 자유롭게 노드를 연결하고 삭제할 수 있는 Custom Edge 기능 구현 완료.
+
+---
+
+## 다음 개선 아이디어
+
+- **CI 파이프라인 연동**: GitHub Actions를 통한 자동화된 빌드 및 테스트, 린트 검사 구성.
+- **모노레포 도구 검토**: Turborepo, Nx 등 루트 레벨에서 여러 모듈의 스크립트를 효율적으로 관리할 수 있는 도구 탐색.
+- **FE 테스트 코드 작성**: Custom Edge 상호작용에 대한 단위 테스트 추가.
