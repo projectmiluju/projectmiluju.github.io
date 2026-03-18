@@ -1,0 +1,89 @@
+---
+title: "CastCanvas Lab: JWT 인증 기초와 캔버스 노트 UX 개선"
+date: 2026-03-17
+summary: "Spring Security와 JWT를 연동한 회원가입·로그인 API를 구축하고, 캔버스 우클릭 메뉴를 통한 노트 생성과 IME 입력 등 전반적인 편집 UX를 개선했다."
+tags: ["Spring Security", "JWT", "Auth", "React Flow", "Canvas", "UX", "IME"]
+category: "til"
+series: "CastCanvas Lab 개발기"
+---
+
+# CastCanvas Lab: JWT 인증 기초와 캔버스 노트 UX 개선
+
+최근 며칠간은 백엔드의 핵심 보안 인프라인 JWT 인증 체계를 잡는 작업과, 프론트엔드에서 사용자가 가장 많이 접하게 될 캔버스 노드의 편집 경험(UX)을 고도화하는 데 집중했다.
+
+---
+
+## 목표
+
+- **백엔드 인증 인프라 구축**: Spring Security와 JWT를 결합해 확장성 있는 인증/인가 구조 만들기.
+- **캔버스 노트 편집 UX 개선**: 우클릭 메뉴를 통한 노드 생성 지원 및 IME(한글/일어 등) 입력 시의 부자연스러운 동작 해결.
+
+---
+
+## 핵심 구현 포인트
+
+### 1) Spring Security + JWT 기반 인증 API (BE)
+
+백엔드에서는 `jjwt` 라이브러리를 활용해 `JwtTokenProvider`를 구현하고, 모든 요청의 헤더를 검사하는 `JwtAuthenticationFilter`를 Security 필터 체인에 등록했다.
+
+- **Stateless 인증**: 세션을 유지하지 않고 토큰 기반으로 사용자 신원을 확인하도록 설정.
+- **회원가입/로그인 Flow**: 패스워드 암호화(BCrypt)와 액세스/리프레시 토큰 발급 로직을 포함한 `AuthService` 구현.
+
+```java
+// JwtTokenProvider.java 일부
+public String createAccessToken(UUID userId) {
+    return Jwts.builder()
+            .setSubject(userId.toString())
+            .setIssuer(issuer)
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpirationMillis))
+            .signWith(secretKey)
+            .compact();
+}
+```
+
+### 2) 캔버스 우클릭 메뉴 및 NoteNode UX (FE)
+
+React Flow 기반 캔버스 위에서 우클릭 시 `CanvasContextMenu`가 나타나며, 클릭한 위치에 즉시 새로운 노트를 생성할 수 있도록 기능을 추가했다. 또한 `NoteNode`의 텍스트 편집 기능을 대폭 개선했다.
+
+- **Direct Editing**: 별도의 인풋창 대신 `contentEditable`을 사용해 노드 위에서 직접 텍스트를 수정.
+- **Event Control**: 편집 중에는 캔버스의 드래그나 패닝 이벤트가 간섭하지 않도록 `nopan nodrag nowheel` 클래스 적용 및 이벤트 전파 차단.
+
+---
+
+## 트러블슈팅 / 고민 포인트
+
+### Chrome IME 조합 중 ESC 입력 시의 비정상 동작
+
+- **원인**: 한글이나 일본어 같은 IME 조합 중에 ESC를 누르면 브라우저(특히 Chrome)가 `onCompositionEnd`를 발생시키며 텍스트를 확정해버리거나, React의 상태 업데이트와 겹쳐 포커스가 튀는 현상이 있었다.
+- **해결**: `isComposingRef`로 조합 상태를 추적하고, 조합 중 ESC가 눌리면 현재 텍스트를 `snapshotRef`에 저장했다가 `onBlur` 시점에 복원하는 로직을 추가했다.
+
+```typescript
+// NoteNode.tsx의 ESC 처리 로직
+onKeyDown={(e) => {
+  if (e.key === 'Escape') {
+    if (isComposingRef.current) {
+      // IME 조합 중이면 현재까지의 텍스트를 스냅샷으로 저장
+      snapshotRef.current = contentRef.current?.textContent ?? '';
+      isComposingRef.current = false;
+    }
+    contentRef.current?.blur();
+    return;
+  }
+  e.stopPropagation(); // 캔버스로의 이벤트 전파 차단
+}}
+```
+
+---
+
+## 결과
+
+- **인증 인프라 확보**: 이제 실제 사용자가 회원가입하고 로그인하여 본인의 데이터를 관리할 수 있는 토대가 마련되었다.
+- **쾌적한 노트 편집**: 캔버스 어디서든 우클릭으로 노트를 만들고, 한글 입력을 포함한 모든 텍스트 편집 과정이 네이티브 앱처럼 매끄러워졌다.
+
+---
+
+## 다음 개선 아이디어
+
+- **리프레시 토큰 Redis 저장**: 보안 강화를 위해 리프레시 토큰을 서버 측 저장소에서 관리하고 화이트리스트/블랙리스트 체계 도입하기.
+- **노트 스타일 커스텀**: 색상 변경이나 글꼴 크기 조절 등 캔버스 요소의 스타일링 기능 확장.
