@@ -1,0 +1,273 @@
+---
+title: "Java 개발자를 위한 Kotlin 문법 퀵스타트"
+date: 2026-03-20
+summary: "Spring Boot 개발을 빠르게 시작하려는 Java 개발자 기준으로 Kotlin의 변수, 함수, null 안전, 컬렉션, 코루틴, 그리고 Spring에서 자주 쓰는 패턴만 압축해서 정리했다."
+tags: ["Kotlin", "Java", "Spring Boot", "Backend"]
+category: "til"
+series: "Today I Learned"
+---
+
+# Java 개발자를 위한 Kotlin 문법 퀵스타트
+
+Kotlin을 처음 볼 때 가장 헷갈리는 지점은 문법이 완전히 새롭다기보다, Java에서 당연하게 하던 반복 작업을 훨씬 짧고 안전하게 바꿔놓았다는 점이다.  
+이 글은 Java 경험자가 Spring Boot 프로젝트에 바로 투입될 때 필요한 Kotlin 핵심만 빠르게 훑는 용도로 정리했다.
+
+---
+
+## 목표
+
+- Java에서 쓰던 표현을 Kotlin으로 빠르게 대응하기
+- Spring Boot 백엔드 코드에서 자주 마주치는 Kotlin 문법 먼저 익히기
+- null 안전성과 컬렉션 처리 방식 차이를 짧게 체감하기
+
+---
+
+## 1. 변수 선언: `val`과 `var`부터 익히기
+
+Kotlin에서는 변수 선언이 훨씬 단순하다.  
+불변이면 `val`, 변경 가능하면 `var`를 쓴다. 대부분의 경우 `val`부터 쓰고, 꼭 필요할 때만 `var`로 내리는 편이 안전하다.
+
+```kotlin
+// Java: final String name = "원용";
+val name: String = "원용"
+
+// Java: String nickname = "dev";
+var nickname = "dev" // 타입 추론 가능
+
+// Nullable
+var email: String? = null
+```
+
+핵심은 `String`과 `String?`를 다른 타입으로 본다는 점이다.  
+Java처럼 모든 참조 타입이 기본적으로 null 가능하다고 가정하지 않는다.
+
+---
+
+## 2. 함수: 짧고, 기본값이 있고, 확장도 된다
+
+Kotlin 함수는 선언이 간결하고, 기본값과 단일 표현식 함수가 실무에서 자주 쓰인다.
+
+```kotlin
+fun greet(name: String): String {
+    return "Hello, $name"
+}
+
+fun greetShort(name: String) = "Hello, $name"
+
+fun createUser(name: String, role: String = "developer") {
+    // ...
+}
+
+fun String.isValidEmail(): Boolean = this.contains("@")
+```
+
+특히 확장 함수는 Java 개발자에게 꽤 강하게 체감되는 차이점이다.  
+유틸 클래스를 늘리는 대신 타입에 자연스럽게 기능을 붙이는 방식으로 읽힌다.
+
+```kotlin
+"dev@example.com".isValidEmail() // true
+```
+
+---
+
+## 3. 클래스: DTO와 응답 모델은 `data class`가 기본
+
+Spring Boot에서 요청 DTO, 응답 DTO, 단순 값 객체를 만들 때는 `data class`를 가장 많이 쓴다.  
+`equals`, `hashCode`, `toString`, `copy`가 자동 생성되기 때문에 Java보다 훨씬 덜 장황하다.
+
+```kotlin
+data class User(
+    val id: String,
+    val email: String,
+    val nickname: String
+)
+
+val updated = user.copy(nickname = "새이름")
+
+data class CreateUserRequest(
+    val email: String,
+    val password: String,
+    val nickname: String = ""
+)
+```
+
+불변 객체를 기본으로 두고 `copy(...)`로 새 객체를 만드는 패턴은 Kotlin 코드 전반에서 자주 등장한다.
+
+---
+
+## 4. Null 안전: Kotlin이 Java보다 체감상 안전한 이유
+
+Kotlin 입문에서 가장 중요한 문법은 null 처리다.  
+실제로는 문법 암기보다 `nullable 타입과 non-null 타입이 다르다`는 감각을 익히는 쪽이 더 중요하다.
+
+```kotlin
+val user: User? = findUser(id)
+
+val email1 = user?.email
+val email2 = user?.email ?: "unknown"
+val email3 = user!!.email
+
+user?.let {
+    println(it.email)
+}
+```
+
+- `?.` 는 null이면 그냥 null을 반환한다.
+- `?:` 는 null일 때 기본값을 준다.
+- `!!` 는 정말 확실할 때만 써야 한다. 잘못 쓰면 Kotlin에서도 그대로 NPE가 난다.
+- `let` 은 null이 아닐 때만 블록을 실행하고 싶을 때 자주 쓴다.
+
+실무에서는 `!!`를 줄이고 `?.`, `?:`, `requireNotNull`, early return으로 흐름을 정리하는 편이 훨씬 안정적이다.
+
+---
+
+## 5. 컬렉션과 람다: Stream보다 가볍게 읽힌다
+
+Kotlin 컬렉션 API는 Java Stream보다 짧고 직관적으로 느껴지는 경우가 많다.  
+특히 간단한 변환과 필터링은 선언형으로 읽기 좋다.
+
+```kotlin
+val logs = listOf("log1", "log2", "log3")
+val tags = mutableListOf("Kotlin", "Spring")
+
+val titles = logs.map { it.uppercase() }
+val kotlinLogs = logs.filter { it.contains("kotlin") }
+val first = logs.find { it.startsWith("log") }
+
+logs.forEach { println(it) }
+
+val grouped = logs.groupBy { it.length }
+```
+
+백엔드 서비스 레이어에서도 응답 변환, 상태 필터링, 그룹핑 같은 작업에 매우 자주 등장한다.
+
+---
+
+## 6. `when`: switch보다 표현력이 높다
+
+Kotlin의 `when`은 단순 분기문이 아니라 값을 반환하는 표현식으로 자주 쓴다.
+
+```kotlin
+val message = when (status) {
+    "draft" -> "작성 중"
+    "reviewed" -> "검토 완료"
+    "published" -> "게시됨"
+    else -> "알 수 없음"
+}
+
+val grade = when (score) {
+    in 90..100 -> "A"
+    in 80..89 -> "B"
+    else -> "F"
+}
+```
+
+enum, sealed class와 같이 쓰기 시작하면 Java의 `switch`보다 훨씬 자연스럽게 읽힌다.
+
+---
+
+## 7. 코루틴: Spring의 비동기 코드를 더 간결하게
+
+Kotlin을 Spring과 함께 쓸 때 관심을 갖게 되는 지점 중 하나가 코루틴이다.  
+비동기 처리를 callback이나 복잡한 reactive 체인 없이 순차 코드처럼 읽히게 만들 수 있다.
+
+```kotlin
+// build.gradle.kts
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+
+suspend fun fetchUser(id: String): User {
+    delay(100)
+    return userRepository.findById(id)
+}
+
+@GetMapping("/users/{id}")
+suspend fun getUser(@PathVariable id: String): User {
+    return userService.fetchUser(id)
+}
+```
+
+다만 JPA 기반 블로킹 코드와 코루틴을 섞을 때는 실행 모델을 명확히 이해하고 써야 한다.  
+문법이 간단하다고 해서 자동으로 논블로킹 시스템이 되는 것은 아니다.
+
+---
+
+## 8. Spring Boot에서 자주 보는 Kotlin 패턴
+
+실제로 백엔드 프로젝트에서는 Entity, Repository, Service, Controller 계층에서 Kotlin 문법이 다음처럼 녹아든다.
+
+```kotlin
+@Entity
+@Table(name = "work_logs")
+class WorkLog(
+    @Id
+    val id: UUID = UUID.randomUUID(),
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    val user: User,
+
+    @Column(columnDefinition = "TEXT")
+    val content: String,
+
+    val loggedAt: LocalDate = LocalDate.now()
+)
+
+interface WorkLogRepository : JpaRepository<WorkLog, UUID> {
+    fun findByUserIdOrderByLoggedAtDesc(userId: UUID): List<WorkLog>
+}
+
+@Service
+@Transactional
+class WorkLogService(
+    private val workLogRepository: WorkLogRepository
+) {
+    fun createLog(userId: UUID, request: CreateLogRequest): WorkLog {
+        val log = WorkLog(
+            user = userRepository.getReferenceById(userId),
+            content = request.content,
+            loggedAt = request.loggedAt
+        )
+        return workLogRepository.save(log)
+    }
+}
+
+@RestController
+@RequestMapping("/api/v1/logs")
+class WorkLogController(
+    private val workLogService: WorkLogService
+) {
+    @PostMapping
+    fun createLog(
+        @AuthenticationPrincipal userId: UUID,
+        @RequestBody @Valid request: CreateLogRequest
+    ): ResponseEntity<WorkLogResponse> {
+        val log = workLogService.createLog(userId, request)
+        return ResponseEntity.status(201).body(log.toResponse())
+    }
+}
+```
+
+눈여겨볼 포인트는 생성자 주입이 기본 문법과 자연스럽게 합쳐지고, DTO나 도메인 모델이 불변 중심으로 작성되기 쉽다는 점이다.
+
+---
+
+## 9. Java와 Kotlin 차이, 최소한 이것만 기억하면 된다
+
+| Java | Kotlin |
+|------|--------|
+| `public class Foo {}` | `class Foo` |
+| `private final String x;` | `val x: String` |
+| Getter/Setter 중심 | 프로퍼티 중심 |
+| 모든 참조형이 사실상 nullable | `?`, `?.`, `?:`로 null 명시 |
+| `instanceof` | `is` |
+| `for (String s : list)` | `for (s in list)` |
+| Stream API | 컬렉션 확장 함수 |
+
+---
+
+## 마무리
+
+Kotlin은 문법이 많아 보여도, Spring Boot 개발 초반에 자주 쓰는 것은 생각보다 한정적이다.  
+`val/var`, `data class`, null 안전, 컬렉션 확장 함수, `when`, 그리고 생성자 주입 형태만 익혀도 대부분의 서비스 코드를 읽고 쓰기 시작할 수 있다.
+
+처음부터 모든 문법을 외우기보다, Java에서 자주 하던 작업을 Kotlin에서 어떻게 더 짧고 안전하게 바꾸는지만 집중해서 익히는 편이 훨씬 빠르다.
