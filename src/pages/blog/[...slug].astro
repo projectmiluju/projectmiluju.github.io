@@ -2,6 +2,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import TableOfContents from '../../components/TableOfContents.astro';
+import { getTagKey } from '../../utils/tags';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog');
@@ -40,7 +41,7 @@ const relatedPosts = allPosts
   .filter((p) => p.slug !== post.slug)
   .filter((p) =>
     p.data.category === category ||
-    p.data.tags.some((t) => tags.includes(t))
+    p.data.tags.some((t) => tags.some((tag) => getTagKey(tag) === getTagKey(t)))
   )
   .slice(0, 3);
 ---
@@ -78,7 +79,7 @@ const relatedPosts = allPosts
           {tags.length > 0 && (
             <div class="post-tags">
               {tags.map((tag) => (
-                <a href={`/blog?tag=${encodeURIComponent(tag)}`} class="ptag">#{tag}</a>
+                <a href={`/blog?tag=${encodeURIComponent(getTagKey(tag))}`} class="ptag">#{tag}</a>
               ))}
             </div>
           )}

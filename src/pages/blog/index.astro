@@ -2,11 +2,16 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { siteConfig } from '../../config/site';
+import { getTagKey } from '../../utils/tags';
 
 const allPosts = (await getCollection('blog', ({ data }) => !data.draft))
   .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 
-const allTags = [...new Set(allPosts.flatMap((p) => p.data.tags))];
+const allTags = [...allPosts.flatMap((p) => p.data.tags).reduce((acc, tag) => {
+  const key = getTagKey(tag);
+  if (!acc.has(key)) acc.set(key, tag);
+  return acc;
+}, new Map<string, string>()).values()];
 
 const categoryLabels: Record<string, string> = {
   cs: 'CS Notes',
@@ -97,7 +102,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
           <span class="filter-prefix"># tags:&nbsp;&nbsp;&nbsp;</span>
           <div class="tag-pills" id="tag-filter">
             {allTags.map(tag => (
-              <button class="tag-pill" data-tag={tag}>#{tag}</button>
+              <button class="tag-pill" data-tag={tag} data-tag-key={getTagKey(tag)}>#{tag}</button>
             ))}
           </div>
         </div>
@@ -135,6 +140,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
                       data-category={post.data.category}
                       data-series={post.data.series || '기타'}
                       data-tags={post.data.tags.join(',')}
+                      data-tag-keys={post.data.tags.map((tag) => getTagKey(tag)).join(',')}
                     >
                       <div class="blog-post-card">
                         <a href={`/blog/${post.slug}`} class="card-link">
@@ -198,6 +204,7 @@ const postsBySeries = allPosts.reduce((acc, post) => {
                     data-category={post.data.category}
                     data-series="기타"
                     data-tags={post.data.tags.join(',')}
+                    data-tag-keys={post.data.tags.map((tag) => getTagKey(tag)).join(',')}
                   >
                     <div class="blog-post-card">
                       <a href={`/blog/${post.slug}`} class="card-link">
@@ -255,8 +262,9 @@ const postsBySeries = allPosts.reduce((acc, post) => {
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     let filters = { category: '', series: '', tag: '', search: '' };
+    const getTagKey = (tag) => tag.trim().toLocaleLowerCase();
 
-    const searchInput = document.getElementById('search-input') as HTMLInputElement;
+    const searchInput = document.getElementById('search-input');
     const searchBtn   = document.getElementById('search-btn');
     const catFilter   = document.getElementById('category-filter');
     const serFilter   = document.getElementById('series-filter');
@@ -271,39 +279,43 @@ const postsBySeries = allPosts.reduce((acc, post) => {
 
     // URL params
     const p = new URLSearchParams(location.search);
-    if (p.get('category')) filters.category = p.get('category')!;
-    if (p.get('series'))   filters.series   = p.get('series')!;
-    if (p.get('tag'))      filters.tag      = p.get('tag')!;
-    if (p.get('q'))      { filters.search   = p.get('q')!; if (searchInput) searchInput.value = filters.search; }
+    if (p.get('category')) filters.category = p.get('category');
+    if (p.get('series'))   filters.series   = p.get('series');
+    if (p.get('tag'))      filters.tag      = getTagKey(p.get('tag'));
+    if (p.get('q'))      { filters.search   = p.get('q'); if (searchInput) searchInput.value = filters.search; }
     applyFilters();
 
     searchBtn?.addEventListener('click', () => { filters.search = searchInput.value.trim(); applyFilters(); });
     searchInput?.addEventListener('keypress', e => { if (e.key === 'Enter') { filters.search = searchInput.value.trim(); applyFilters(); } });
 
     catFilter?.addEventListener('click', e => {
-      const btn = (e.target as HTMLElement).closest('.pill') as HTMLElement;
+      const btn = e.target instanceof Element ? e.target.closest('.pill') : null;
       if (btn) { filters.category = btn.dataset.category || ''; filters.series = ''; applyFilters(); }
     });
 
     serFilter?.addEventListener('click', e => {
-      const btn = (e.target as HTMLElement).closest('.series-pill') as HTMLElement;
+      const btn = e.target instanceof Element ? e.target.closest('.series-pill') : null;
       if (btn) { filters.series = btn.dataset.series || ''; if (btn.dataset.category) filters.category = btn.dataset.category; applyFilters(); }
     });
 
     document.querySelectorAll('.series-view-all').forEach(btn => {
       btn.addEventListener('click', e => {
         e.preventDefault();
-        const b = btn as HTMLElement;
+        const b = btn;
         filters.series = b.dataset.series || '';
-        const block = b.closest('.series-block') as HTMLElement;
+        const block = b.closest('.series-block');
         if (block?.dataset.category) filters.category = block.dataset.category;
         applyFilters();
       });
     });
 
     tagFilter?.addEventListener('click', e => {
-      const btn = (e.target as HTMLElement).closest('.tag-pill') as HTMLElement;
-      if (btn) { filters.tag = filters.tag === btn.dataset.tag ? '' : btn.dataset.tag || ''; applyFilters(); }
+      const btn = e.target instanceof Element ? e.target.closest('.tag-pill') : null;
+      if (btn) {
+        const nextTag = btn.dataset.tagKey || '';
+        filters.tag = filters.tag === nextTag ? '' : nextTag;
+        applyFilters();
+      }
     });
 
     clearBtn?.addEventListener('click', clearAll);
@@ -324,21 +336,22 @@ const postsBySeries = allPosts.reduce((acc, post) => {
       const isLimitedState = !filters.series && !filters.tag && !filters.search;
 
       // Track card visibility per series for the limited state
-      const seriesVisibleCounts: Record<string, number> = {};
+      const seriesVisibleCounts = {};
 
       // Filter individual cards
       document.querySelectorAll('.post-card-wrapper').forEach(el => {
-        const card = el as HTMLElement;
+        const card = el;
         const cCat = card.dataset.category;
         const cSer = card.dataset.series || '기타';
         const cTags = card.dataset.tags?.split(',') || [];
+        const cTagKeys = card.dataset.tagKeys?.split(',') || [];
         const cTitle = card.dataset.title?.toLowerCase() || '';
         const cSum = card.dataset.summary?.toLowerCase() || '';
 
         let isMatch = true;
         if (filters.category && cCat !== filters.category) isMatch = false;
         if (filters.series && cSer !== filters.series) isMatch = false;
-        if (filters.tag && !cTags.includes(filters.tag)) isMatch = false;
+        if (filters.tag && !cTagKeys.includes(filters.tag)) isMatch = false;
         if (q && !cTitle.includes(q) && !cSum.includes(q) && !cTags.some(t => t.toLowerCase().includes(q))) isMatch = false;
 
         let shouldShow = isMatch;
@@ -357,12 +370,12 @@ const postsBySeries = allPosts.reduce((acc, post) => {
 
       // Filter series blocks
       document.querySelectorAll('.series-block').forEach(el => {
-        const block = el as HTMLElement;
+        const block = el;
         const visibleInBlock = block.querySelectorAll('.post-card-wrapper:not([style*="display: none"])').length;
         block.style.display = visibleInBlock > 0 ? '' : 'none';
       });
 
-      emptyState!.hidden = totalVisible > 0;
+      if (emptyState) emptyState.hidden = totalVisible > 0;
       if (emptyQuery) emptyQuery.textContent = filters.search || filters.tag || filters.series || filters.category;
 
       updateUI();
@@ -370,28 +383,25 @@ const postsBySeries = allPosts.reduce((acc, post) => {
     }
 
     function updateUI() {
-      catFilter?.querySelectorAll('.pill').forEach(b => (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset.category === filters.category));
+      catFilter?.querySelectorAll('.pill').forEach(b => b.classList.toggle('active', b.dataset.category === filters.category));
       serFilter?.querySelectorAll('.series-pill').forEach(b => {
-        const sb = b as HTMLElement;
-        const isVisible = !filters.category || sb.dataset.category === filters.category;
-        sb.style.display = isVisible ? '' : 'none';
-        sb.classList.toggle('active', sb.dataset.series === filters.series);
+        const isVisible = !filters.category || b.dataset.category === filters.category;
+        b.style.display = isVisible ? '' : 'none';
+        b.classList.toggle('active', b.dataset.series === filters.series);
       });
 
       // Update Tag pills visibility
       const visibleCards = Array.from(document.querySelectorAll('.post-card-wrapper')).filter(el => {
-        const card = el as HTMLElement;
-        if (filters.category && card.dataset.category !== filters.category) return false;
-        if (filters.series && card.dataset.series !== filters.series) return false;
+        if (filters.category && el.dataset.category !== filters.category) return false;
+        if (filters.series && el.dataset.series !== filters.series) return false;
         return true;
-      }) as HTMLElement[];
+      });
       
-      const relevantTags = new Set(visibleCards.flatMap(c => c.dataset.tags?.split(',') || []));
+      const relevantTags = new Set(visibleCards.flatMap(c => c.dataset.tagKeys?.split(',') || []));
       tagFilter?.querySelectorAll('.tag-pill').forEach(b => {
-        const tb = b as HTMLElement;
-        const isVisible = relevantTags.has(tb.dataset.tag || '');
-        tb.style.display = isVisible ? '' : 'none';
-        tb.classList.toggle('active', tb.dataset.tag === filters.tag);
+        const isVisible = relevantTags.has(b.dataset.tagKey || '');
+        b.style.display = isVisible ? '' : 'none';
+        b.classList.toggle('active', b.dataset.tagKey === filters.tag);
       });
     }
 
@@ -400,10 +410,13 @@ const postsBySeries = allPosts.reduce((acc, post) => {
       const parts = [];
       if (filters.category) parts.push(`category=${filters.category}`);
       if (filters.series)   parts.push(`series="${filters.series}"`);
-      if (filters.tag)      parts.push(`tag=#${filters.tag}`);
+      if (filters.tag) {
+        const activeTag = tagFilter?.querySelector(`.tag-pill[data-tag-key="${CSS.escape(filters.tag)}"]`);
+        parts.push(`tag=#${activeTag?.dataset.tag || filters.tag}`);
+      }
       if (filters.search)   parts.push(`q="${filters.search}"`);
       badgesEl.innerHTML = parts.map(p => `<span class="badge">${p}</span>`).join('');
-      activeBar!.hidden = parts.length === 0;
+      if (activeBar) activeBar.hidden = parts.length === 0;
     }
   });
 </script>

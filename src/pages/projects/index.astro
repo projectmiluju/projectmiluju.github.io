@@ -1,11 +1,19 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getStackGroupLabel, getStackKey } from '../../utils/stacks';
 
 const allProjects = (await getCollection('projects', ({ data }) => !data.draft))
   .sort((a, b) => b.data.order - a.data.order);
 
-const allTags = [...new Set(allProjects.flatMap((p) => p.data.stack))].sort();
+const allTags = [...allProjects.flatMap((p) => p.data.stack).reduce((acc, stack) => {
+  const key = getStackKey(stack);
+  if (!key || acc.has(key)) return acc;
+  acc.set(key, getStackGroupLabel(stack));
+  return acc;
+}, new Map<string, string>()).entries()]
+  .sort((a, b) => a[1].localeCompare(b[1]))
+  .map(([key, label]) => ({ key, label }));
 
 const projectsData = allProjects.map(project => ({
   slug: project.slug,
@@ -44,7 +52,7 @@ const projectsData = allProjects.map(project => ({
           <div class="filter-tags" id="tag-list">
             <button class="ftag active" data-tag="">[all]</button>
             {allTags.map((tag) => (
-              <button class="ftag" data-tag={tag}>[{tag}]</button>
+              <button class="ftag" data-tag={tag.key} data-label={tag.label}>[{tag.label}]</button>
             ))}
           </div>
         </div>
@@ -58,7 +66,12 @@ const projectsData = allProjects.map(project => ({
       <!-- Projects Grid -->
       <div class="projects-grid" id="projects-grid">
         {allProjects.map((project, index) => (
-          <article class={`pcard reveal stagger-${(index % 6) + 1}`} style={`transition-delay: ${index * 70}ms;`} data-stack={project.data.stack.join(',')}>
+          <article
+            class={`pcard reveal stagger-${(index % 6) + 1}`}
+            style={`transition-delay: ${index * 70}ms;`}
+            data-stack={project.data.stack.join(',')}
+            data-stack-keys={project.data.stack.map((stack) => getStackKey(stack)).join(',')}
+          >
             <a href={`/projects/${project.slug}`} class="pcard-link">
 
               <!-- Terminal titlebar -->
@@ -151,14 +164,14 @@ const projectsData = allProjects.map(project => ({
     const urlParams = new URLSearchParams(window.location.search);
     const tagParam = urlParams.get('tag');
     if (tagParam) {
-      currentTag = tagParam;
+      currentTag = tagParam.trim().toLocaleLowerCase();
       applyFilter();
     }
 
     tagList?.addEventListener('click', (e) => {
-      const target = e.target;
-      if (target.classList.contains('ftag')) {
-        currentTag = target.dataset.tag || '';
+      const button = e.target instanceof Element ? e.target.closest('.ftag') : null;
+      if (button) {
+        currentTag = button.dataset.tag || '';
         applyFilter();
       }
     });
@@ -187,14 +200,16 @@ const projectsData = allProjects.map(project => ({
       if (filterActive) {
         filterActive.hidden = !currentTag;
       }
-      if (activeTagLabel) activeTagLabel.textContent = currentTag;
-      if (emptyTag) emptyTag.textContent = currentTag;
+      const activeButton = tagList?.querySelector(`.ftag[data-tag="${CSS.escape(currentTag)}"]`);
+      const activeLabel = activeButton?.dataset.label || currentTag;
+      if (activeTagLabel) activeTagLabel.textContent = activeLabel;
+      if (emptyTag) emptyTag.textContent = activeLabel;
 
       // Filter cards
       let visibleCount = 0;
       projectCards?.forEach(card => {
-        const stack = card.dataset.stack?.split(',') || [];
-        const shouldShow = !currentTag || stack.includes(currentTag);
+        const stackKeys = card.dataset.stackKeys?.split(',') || [];
+        const shouldShow = !currentTag || stackKeys.includes(currentTag);
         card.style.display = shouldShow ? '' : 'none';
         if (shouldShow) visibleCount++;
       });

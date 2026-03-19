@@ -1,4 +1,5 @@
 import { defineCollection, z } from 'astro:content';
+import { normalizeTags } from '../utils/tags';
 
 const blogCollection = defineCollection({
   type: 'content',
@@ -6,7 +7,7 @@ const blogCollection = defineCollection({
     title: z.string(),
     date: z.coerce.date(),
     summary: z.string(),
-    tags: z.array(z.string()).default([]),
+    tags: z.array(z.string()).default([]).transform((tags) => normalizeTags(tags)),
     category: z.enum(['cs', 'book', 'til']),
     series: z.string().optional(),
     cover: z.string().optional(),
