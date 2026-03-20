@@ -111,7 +111,14 @@ export const siteConfig = {
       category: 'til',
       folder: 'til/boothliner-devlog',
       icon: '🧩'
-    }
+    },
+    {
+      slug: 'BOOK_MAKER 개발기',
+      name: 'BOOK_MAKER 개발기',
+      category: 'til',
+      folder: 'til/bookmaker-devlog',
+      icon: '📖'
+    },
   ],
 };
 
