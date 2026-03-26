@@ -1,0 +1,113 @@
+---
+title: "CastCanvas Lab: Redis 기반 인증 보안 강화와 워크스페이스 CRUD 구현"
+date: 2026-03-25
+summary: "리프레시 토큰의 Redis 저장소 도입으로 인증 보안을 강화하고, 워크스페이스 생성·수정·삭제 API 및 프론트엔드 라우트 가드를 구현하여 기초적인 사용자 서비스 환경을 구축했다."
+tags: ["Redis", "Spring Boot", "JWT", "Auth", "CRUD", "React Flow", "UX"]
+category: "til"
+series: "CastCanvas Lab 개발기"
+---
+
+# CastCanvas Lab: Redis 기반 인증 보안 강화와 워크스페이스 CRUD 구현
+
+지난 기록 이후, 백엔드의 인증 인프라를 한층 더 견고하게 다지는 작업과 함께 사용자의 데이터를 실질적으로 관리하기 위한 첫걸음인 워크스페이스 CRUD 기능을 구현했다. 또한 프론트엔드에서는 로그인 여부에 따른 접근 제어(Route Guard)와 캔버스 사용성을 높이기 위한 디테일한 UX 보정을 진행했다.
+
+---
+
+## 목표
+
+- **인증 보안 강화**: 무상태(Stateless)인 JWT의 한계를 보완하기 위해 리프레시 토큰을 서버 측(Redis)에서 관리하고 검증하기.
+- **워크스페이스 기초 기능 구축**: 사용자가 본인의 캔버스 프로젝트를 생성하고 관리할 수 있는 API 개발.
+- **라우트 가드 및 UX 개선**: 미인증 사용자의 접근을 차단하고, 캔버스 내 메뉴가 화면 밖으로 나가는 현상 해결.
+
+---
+
+## 핵심 구현 포인트
+
+### 1) Redis 기반 리프레시 토큰 관리 (BE)
+
+단순히 토큰의 유효성만 검사하던 방식에서 탈피하여, `RedisRefreshTokenRepository`를 도입해 발급된 리프레시 토큰을 서버에서 추적할 수 있게 했다. 이를 통해 토큰 탈취 시 대응이 가능해졌으며, 재발급(Refresh) 시 기존 토큰을 무효화하는 로직을 추가했다.
+
+- **토큰 무효화**: 새로운 토큰 쌍을 발급할 때 기존 리프레시 토큰을 삭제하여 보안성을 높였다.
+- **Spring Data Redis**: `StringRedisTemplate`을 사용하여 간단하면서도 성능 좋은 저장 구조를 가졌다.
+
+```java
+// AuthService.java의 refresh 로직
+@Transactional
+public TokenResponse refresh(RefreshRequest request) {
+    String token = request.refreshToken();
+
+    // 1. JWT 유효성 검증
+    if (!jwtTokenProvider.validate(token) || !jwtTokenProvider.isRefreshToken(token)) {
+        throw new DomainException(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    UUID userId = jwtTokenProvider.extractUserId(token);
+
+    // 2. Redis에 저장된 토큰과 대조
+    String stored = refreshTokenRepository.findByUserId(userId)
+            .orElseThrow(() -> new DomainException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+    if (!stored.equals(token)) {
+        throw new DomainException(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    // 3. 기존 토큰 삭제 및 신규 발급
+    refreshTokenRepository.deleteByUserId(userId);
+    return issueTokens(userId);
+}
+```
+
+### 2) 워크스페이스 CRUD API (BE)
+
+사용자가 자신의 아이디어를 담을 '워크스페이스'를 관리할 수 있는 API를 구축했다. Spring Data JPA와 Flyway를 활용해 테이블 스키마를 정의하고, 기본적인 생성, 조회, 수정, 삭제 기능을 구현했다.
+
+- **Domain Driven**: `Workspace` 엔티티 내에 비즈니스 로직을 응집시켜 유지보수성을 확보했다.
+- **Test Driven**: `WorkspaceControllerTest`를 통해 모든 엔드포인트의 정상 작동을 검증했다.
+
+### 3) 인증 상태 기반 라우트 가드와 로그아웃 (FE)
+
+프론트엔드에서는 `ProtectedRoute`와 `PublicRoute` 컴포넌트를 구현하여, 로그인하지 않은 사용자가 워크스페이스나 캔버스에 접근하는 것을 원천 차단했다.
+
+- **Navigation Guard**: 인증이 필요한 경로 진입 시 토큰 존재 여부를 확인하고, 없으면 로그인 페이지로 리다이렉트한다.
+- **Logout Flow**: 로그아웃 시 로컬 스토리지의 토큰을 제거하고 메인 페이지로 이동시킨다.
+
+---
+
+## 트러블슈팅 / 고민 포인트
+
+### 캔버스 우클릭 메뉴의 위치 이탈 현상
+
+- **원인**: 캔버스의 우측 하단이나 하단 가장자리 근처에서 우클릭 시, 메뉴가 브라우저 뷰포트를 벗어나 일부가 가려지는 현상이 발생했다.
+- **해결**: `useLayoutEffect`를 사용해 메뉴가 렌더링된 직후의 실제 크기(`getBoundingClientRect`)를 측정하고, 화면 경계를 넘지 않도록 위치 값(x, y)을 보정(Clamping)하는 로직을 추가했다.
+
+```typescript
+// CanvasContextMenu.tsx의 위치 보정 로직
+const { width, height } = menu.getBoundingClientRect();
+const viewportWidth = window.innerWidth;
+const viewportHeight = window.innerHeight;
+
+// 화면 우측/하단 경계를 넘지 않도록 보정
+const clampedX = Math.min(x, viewportWidth - width - VIEWPORT_PADDING);
+const clampedY = Math.min(y, viewportHeight - height - VIEWPORT_PADDING);
+
+setPosition({
+  x: Math.max(VIEWPORT_PADDING, clampedX), // 좌측 경계 보정
+  y: Math.max(VIEWPORT_PADDING, clampedY), // 상단 경계 보정
+});
+```
+
+---
+
+## 결과
+
+- **보안성 강화**: 이제 리프레시 토큰이 Redis에서 안전하게 관리되며, 비정상적인 접근 시 서버 측에서 제어할 수 있는 기반이 마련되었다.
+- **서비스 기초 구조 확보**: 워크스페이스 API와 인증 가드를 통해 실제 서비스가 동작하기 위한 최소한의 데이터 흐름과 보안 요건을 충족했다.
+- **디테일한 UX**: 캔버스 내 어디서든 우클릭 메뉴가 잘리지 않고 정상적으로 표시되어 쾌적한 작업 환경을 제공한다.
+
+---
+
+## 다음 개선 아이디어
+
+- **워크스페이스 공유 기능**: 다른 사용자에게 워크스페이스를 공유하거나 협업할 수 있는 권한 관리 시스템 도입.
+- **캔버스 자동 저장**: 사용자가 작업하는 내용을 실시간으로 백엔드에 저장하는 메커니즘 구축.
+- **컴포넌트 스타일링 고도화**: 현재 Vanilla CSS 기반의 스타일을 보다 체계적으로 관리하기 위한 디자인 시스템 구축.
