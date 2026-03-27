@@ -1,0 +1,101 @@
+---
+title: "BOOK_MAKER 개발기 #3 — 초안 내 기록 순서 변경 및 백엔드 연동 구현"
+date: 2026-03-27
+summary: "초안(Draft) 내에 담긴 기록들의 순서를 자유롭게 변경할 수 있는 기능을 구현하고, 프론트엔드와 백엔드의 데이터 연동을 완료했습니다."
+tags: [BOOK_MAKER, Backend, Frontend, NestJS, Nuxt, PostgreSQL]
+category: "til"
+series: "BOOK_MAKER 개발기"
+---
+
+# BOOK_MAKER 개발기 #3 — 초안 내 기록 순서 변경 및 백엔드 연동 구현
+
+사용자가 초안(Draft)을 구성할 때 기록들의 배치 순서를 조정하고 싶어 하는 니즈를 반영하여, 드래그 앤 드롭(또는 순서 변경 UI)을 통해 기록의 `position` 값을 업데이트하는 기능을 백엔드 서비스와 프론트엔드 컴포저블에 구현했습니다.
+
+---
+
+## 목표
+
+- 초안 상세 화면(`/app/drafts/[id]`)에서 포함된 기록들의 순서를 변경하는 기능 구현
+- 백엔드 `DraftsService`에 순서 변경 API(`PATCH /drafts/:id/entries/reorder`) 로직 추가
+- 프론트엔드 `useDrafts` 컴포저블을 통한 상태 동기화 및 에러 핸들링 보강
+
+---
+
+## 핵심 구현 포인트
+
+### 1) 백엔드: 효율적인 순서 업데이트 로직
+
+`DraftsService`에서 초안 내 기록들의 순서를 일괄적으로 업데이트하는 기능을 구현했습니다. 요청 시 전달된 `entryIds` 배열의 인덱스를 기반으로 각 기록의 `position` 값을 재설정합니다. 이때, 기존 초안에 포함된 기록들과 요청된 기록들의 ID 셋(Set)이 일치하는지 검증하여 데이터 무결성을 보장했습니다.
+
+```typescript
+// apps/api/src/drafts/drafts.service.ts
+async reorderDraftEntries(
+  userId: string,
+  draftId: string,
+  entryIds: string[],
+): Promise<DraftDetailRecord> {
+  // ... 검증 로직 생략 ...
+  let position = 0;
+  for (const entryId of entryIds) {
+    position += 1;
+    await this.databaseService.getPool().query(
+      `UPDATE draft_entries SET position = $3
+       WHERE draft_id = $1 AND entry_id = $2`,
+      [draftId, entryId, position],
+    );
+  }
+  // 초안의 updatedAt 갱신
+  await this.databaseService.getPool().query(
+    `UPDATE drafts SET updated_at = NOW() WHERE id = $1 AND user_id = $2`,
+    [draftId, userId],
+  );
+  return this.findDraftById(userId, draftId);
+}
+```
+
+### 2) 프론트엔드: useDrafts 컴포저블 확장
+
+프론트엔드에서는 `reorderDraftEntries` 메서드를 추가하여 API 호출 결과를 반응형 상태(`currentDraft`)에 즉시 반영하도록 구성했습니다. 또한 `reorderState`를 통해 작업 진행 상태(Submitting, Error 등)를 관리하여 사용자에게 피드백을 제공합니다.
+
+```typescript
+// apps/web/app/composables/useDrafts.ts
+async function reorderDraftEntries(draftId: string, entryIds: string[]) {
+  reorderState.value = 'submitting';
+  try {
+    const draft = await options.api.reorderDraftEntries(draftId, entryIds);
+    currentDraft.value = draft;
+    syncDraft(draft); // 목록 상태와 동기화
+    reorderState.value = 'idle';
+    return draft;
+  } catch {
+    reorderState.value = 'error';
+    reorderError.value = '초안 순서를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    return null;
+  }
+}
+```
+
+---
+
+## 트러블슈팅 / 고민 포인트
+
+### 데이터 무결성 검증
+
+- **원인**: 순서 변경 요청 시 일부 기록 ID가 누락되거나 초안에 없는 ID가 포함될 경우, 데이터의 일관성이 깨질 위험이 있었습니다.
+- **해결**: `hasSameEntrySet` 유틸리티 함수를 만들어, 현재 DB에 저장된 초안 내 기록 ID 목록과 클라이언트가 보낸 목록을 비교하여 정확히 일치할 때만 업데이트를 수행하도록 방어 로직을 강화했습니다.
+
+---
+
+## 결과
+
+- 초안 상세 페이지에서 기록 순서 변경 및 실시간 데이터 반영 기능 구현 완료
+- NestJS 백엔드와 Nuxt 프론트엔드 간의 PATCH 메서드를 활용한 데이터 통신 구조 확립
+- 순서 변경 로직에 대한 백엔드 통합 테스트 및 프론트엔드 단위 테스트 케이스 추가
+
+---
+
+## 다음 개선 아이디어
+
+- 실제 드래그 앤 드롭 라이브러리(예: `vuedraggable`)를 연동하여 더 직관적인 UX 제공
+- 초안 내의 기록을 개별적으로 삭제하거나 다른 초안으로 이동하는 기능 추가
+- 대량의 기록이 포함된 초안의 경우, 순서 변경 시 DB 부하를 줄이기 위한 벌크 업데이트 방식 고민
