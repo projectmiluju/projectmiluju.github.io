@@ -1,0 +1,168 @@
+---
+title: "miluju-studio 개발 전체 요약 — 스킬 설계부터 CLI 배포까지"
+date: 2026-03-27
+summary: "1인 개발자를 위한 AI 에이전트 워크플로우 인프라 miluju-studio의 전체 개발 과정을 정리합니다. 스킬 7종 설계, 8개 에이전트 자동 변환 생성기, MCP 브라우저 검수 서버, LLM-as-a-judge 평가 시스템, CLI 유틸리티, 이슈 기반 워크플로우까지 — 무엇을 만들었고, 왜 그렇게 결정했으며, 앞으로 무엇을 만들 것인지를 기록합니다."
+tags: [miluju-studio, AI에이전트, MCP, 스킬시스템, 1인개발, CLI, LLM평가, 브라우저검수, GitHub워크플로우]
+category: "til"
+series: "Miluju Studio 개발기"
+---
+
+# miluju-studio 개발 전체 요약 — 스킬 설계부터 CLI 배포까지
+
+AI 에이전트에게 "이렇게 일해"라고 알려주는 마크다운 스킬 파일 7개, 그 스킬이 8개 에이전트에서 동작하도록 자동 변환하는 생성기, 한글 UI를 브라우저에서 직접 검수하는 MCP 서버, 스킬 변경 시 품질을 잡아주는 LLM 평가 시스템, 그리고 이 모든 것을 한 줄로 설치하는 CLI까지 — miluju-studio가 어떻게 만들어졌는지 기록합니다.
+
+---
+
+## 목표
+
+- AI 에이전트가 설계(spec)부터 배포(ops), 문서화(docs)까지 일관된 품질로 작업할 수 있는 **1인 개발자 전용 워크플로우 인프라** 구축
+- 특정 에이전트에 종속되지 않고, Claude Code·Cursor·Gemini·Codex·Copilot·Antigravity·Kiro·Windsurf 등 **8개 에이전트에서 동일한 스킬을 사용**할 수 있는 구조 설계
+- 한글 프로젝트에서 반복적으로 놓치는 문제(word-break, 한글 폰트, IME 입력)를 자동으로 잡아주는 **검수 도구 내장**
+
+---
+
+## 핵심 구현 포인트
+
+### 1) 스킬 7종 + 공통 기반(_base.md) 설계
+
+7개 역할(`spec → ui → build → qa → ship → ops → docs`)이 파이프라인으로 연결되는 구조를 설계했습니다. 각 스킬은 `_base.md`의 공통 원칙(1인 개발자 5원칙, 안티-아첨 프레임워크, 한글 프로젝트 지침)을 상속하며, 역할별로 HARD GATE(절대 넘으면 안 되는 선), 워크플로우 Phase, 에스컬레이션 프로토콜, 핸드오프 테이블, 완료 상태 코드를 갖습니다.
+
+```
+스킬 파이프라인:
+spec → ui → build → qa → ship → ops → docs
+ 명세    화면    구현     검증    출시    운영    기록
+```
+
+| 스킬 | 핵심 역할 | 대표 기능 |
+|------|-----------|-----------|
+| `spec` | 명세 | PRD 작성, 사고 방지 체크리스트, GitHub Issue 분해 |
+| `ui` | 화면 | 디자인 시스템, Stitch 프로토타입, 한글 로컬라이제이션 |
+| `build` | 구현 | 7가지 안티패턴 차단, 한글 문자열 중앙화, 타입 안전 |
+| `qa` | 검증 | 테스트 시나리오 매트릭스, IME 입력 테스트, 버그 리포트 |
+| `ship` | 출시 | 이슈 기반 브랜치, PR 템플릿, SemVer, 한글 CHANGELOG |
+| `ops` | 운영 | 인프라 3-tier 선택, CI/CD, UTF-8 로그 검증 |
+| `docs` | 기록 | Dev Log, ADR, README 동기화, STATUS.md |
+
+### 2) 스킬 생성기(gen-skill-docs) — 1벌 작성 → 56파일 자동 변환
+
+에이전트마다 스킬 파일 포맷이 다릅니다. Claude Code는 `/slash`, Cursor는 `@mention`, Codex는 `$skill`, Kiro는 `#reference`. 스킬을 에이전트 수만큼 복붙하면 동기화가 깨집니다. 그래서 `skills/` 디렉토리의 마크다운 7벌을 입력으로 받아 8개 에이전트용 56개 파일을 자동 생성하는 파이프라인을 만들었습니다.
+
+```typescript
+// src/gen-skill-docs.ts — 핵심 흐름
+const baseBody = await loadBase(skillsDir);        // _base.md 로드
+const skills = await loadSkills(skillsDir);         // 7개 스킬 파싱
+
+for (const target of AGENT_TARGETS) {               // 8개 에이전트
+  for (const skill of skills) {                      // 7개 스킬
+    const merged = mergeBaseIntoSkill(baseBody, skill);  // _base 인라인 병합
+    const transformed = transformForAgent(merged, target, skill.name);  // 에이전트별 변환
+    await writeSkill(outDir, target, skill.name, transformed);  // 파일 출력
+  }
+}
+```
+
+아키텍처는 3개 모듈로 분리했습니다:
+- **parser.ts** — YAML frontmatter 파싱 + `_base.md` 병합 (참조 라인 제거 → 부록으로 인라인)
+- **transformer.ts** — 볼드 역할 참조(`**spec**`)를 에이전트별 호출 구문(`/spec`, `@spec`, `$spec`, `#spec`)으로 치환 + 에이전트별 헤더 생성
+- **writer.ts** — `dist/skills/{agent}/{skill}.md` 경로에 파일 출력 + 결과 리포트
+
+### 3) MCP 브라우저 검수 서버 — 한글 렌더링을 직접 보고 잡는다
+
+한글 프로젝트에서 반복되는 3대 문제를 브라우저에서 직접 검수하는 MCP 서버를 만들었습니다. `@modelcontextprotocol/sdk` + Playwright 기반이며, stdio/SSE 듀얼 모드를 지원합니다.
+
+```typescript
+// 4개 커스텀 MCP 도구
+miluju_korean_audit        // word-break, 텍스트 overflow, 한글 폰트 스택 검증
+miluju_a11y_audit          // WCAG 2.2 AA — 색상 대비, 터치 타겟, ARIA, alt 텍스트
+miluju_design_token_audit  // 하드코딩된 색상, 비일관적 간격, 타이포그래피 스케일
+miluju_full_audit          // 위 3개를 한 번에 실행
+```
+
+`init-scripts/korean-helpers.js`를 페이지에 주입하여 `window.__miluju` 객체로 검수 함수를 노출하고, 각 도구는 `page.evaluate()`로 이 함수를 호출합니다. 검수 결과는 마크다운 리포트로 포맷팅하여 에이전트에게 전달됩니다.
+
+### 4) LLM-as-a-Judge 평가 시스템 — 스킬 수정이 품질을 떨어뜨리는지 자동 감지
+
+스킬 마크다운을 수정하면 "응답 품질이 올랐나, 내렸나?"를 알 수 없습니다. 이걸 자동으로 잡기 위해 Anthropic API를 활용한 LLM-as-a-Judge 평가 시스템을 구축했습니다.
+
+```
+평가 흐름:
+  1. 스킬 마크다운(시스템 프롬프트) + 사용자 입력 → LLM 응답 생성
+  2. 응답 + 평가 기준(criteria) → Judge LLM이 1~5점 채점
+  3. 가중 평균 점수 계산 + 필수/금지 키워드 검사
+  4. passThreshold(기본 3.0) 미달 시 FAIL
+```
+
+spec·ui·build·qa 스킬에 대해 평가 케이스가 정의되어 있으며, `--skill`, `--model`, `--threshold`, `--save` 옵션으로 세밀한 제어가 가능합니다.
+
+### 5) CLI 유틸리티(miluju) — 한 줄로 스킬 설치
+
+`miluju install` 명령어 하나로 대상 프로젝트에 에이전트별 스킬 파일 + MCP 설정을 자동 설치합니다.
+
+```bash
+bun run miluju install --agent claude-code --target ~/my-project
+bun run miluju install --agent cursor --agent windsurf --target ~/my-project
+bun run miluju install --target ~/my-project  # 모든 에이전트 한 번에
+```
+
+에이전트별로 설치 경로와 형식이 다릅니다:
+- **flat** — `.claude/commands/spec.md` (Claude Code, Cursor, Windsurf, Gemini, Kiro)
+- **directory** — `.codex/skills/spec/SKILL.md` (Codex, Antigravity)
+- **instructions** — `.github/instructions/spec.instructions.md` (Copilot)
+
+MCP 설정도 에이전트별 포맷에 맞게 자동 생성합니다 (JSON `mcpServers` / JSON `servers` + `type` / TOML).
+
+`miluju doctor`는 Bun, Node.js, Git, Playwright, API 키, 빌드 상태 등 실행 환경을 한 번에 진단합니다.
+
+### 6) 이슈 기반 워크플로우 + 브랜치 전략 문서화
+
+기존 스킬에 GitHub Issue 기반 워크플로우를 추가했습니다. PRD에서 바로 코딩으로 넘어가던 흐름을 "PRD → Issue 분해 → 이슈 기반 브랜치 → PR → 이슈 자동 닫기"로 체계화했습니다.
+
+| 스킬 | 추가된 내용 |
+|------|------------|
+| `_base.md` | 파이프라인에 이슈 기반 워크플로우 흐름도 추가 |
+| `spec.md` | Issue 분해 원칙, Issue 템플릿, `gh issue create` 프로세스 |
+| `build.md` | 입력물에 GitHub Issue 추가, Issue 없으면 코딩 금지 HARD GATE |
+| `ship.md` | 이슈 번호 기반 브랜치 네이밍(`feat/#12-...`), PR 템플릿, `Closes #이슈번호` 자동 닫기 |
+
+---
+
+## 트러블슈팅 / 고민 포인트
+
+### _base.md를 각 스킬에 어떻게 합칠 것인가
+
+- **원인**: 에이전트마다 컨텍스트 로딩 방식이 달라서 `_base.md`를 별도 파일로 참조하면 일부 에이전트에서 공통 원칙이 무시됩니다.
+- **해결**: `mergeBaseIntoSkill()`에서 `_base.md` 참조 라인(`> 이 스킬은 _base.md...`)을 제거하고, 본문 뒤에 `# 부록: miluju-studio 공통 원칙`으로 인라인 병합. 모든 에이전트가 단일 파일만 읽으면 공통 원칙이 보장됩니다.
+
+### 에이전트별 역할 참조 변환
+
+- **원인**: 원본 스킬에서 `**spec**`(볼드)으로 역할을 참조하는데, 에이전트마다 호출 구문이 전부 다릅니다.
+- **해결**: `getRoleReplacer()` 함수에서 에이전트별 패턴을 정의하고, `transformRoleReferences()`가 정규식으로 일괄 치환. Codex는 YAML frontmatter가 필수여서 `getHeader()`에서 별도 처리.
+
+### MCP stdio 서버가 Bun 환경에서 조용히 종료되는 문제
+
+- **원인**: Bun에서 stdio 서버를 실행하면 활성 핸들이 없을 때 프로세스가 즉시 종료됩니다.
+- **해결**: `process.stdin.resume()`으로 stdin을 활성 상태로 유지하여 MCP 클라이언트의 초기화 메시지를 기다리도록 수정. 디버그 로그(`/tmp/miluju-browse-debug.log`)도 추가하여 연결 상태를 추적.
+
+---
+
+## 결과
+
+- **스킬 7종** + 공통 기반 `_base.md` — 7개 역할의 파이프라인으로 설계~배포~문서화 전 과정 커버
+- **스킬 생성기** — `bun run gen` 한 번으로 8 에이전트 × 7 스킬 = 56개 파일 자동 생성
+- **MCP 브라우저 서버** — 한글 검수(word-break, overflow, 폰트) + 접근성(WCAG 2.2 AA) + 디자인 토큰 일관성 검증
+- **LLM 평가 시스템** — `bun run eval`로 스킬 변경 시 응답 품질 회귀 자동 감지
+- **CLI 유틸리티** — `miluju install`로 대상 프로젝트에 스킬 + MCP 설정 원클릭 설치, `miluju doctor`로 환경 진단
+- **이슈 기반 워크플로우** — PRD → GitHub Issue 분해 → 이슈 기반 브랜치(`feat/#12-...`) → PR 템플릿 → 이슈 자동 닫기
+
+---
+
+## 다음 개선 아이디어
+
+- **스킬 버전 관리**: 스킬 파일에 버전을 태깅하고, 설치된 프로젝트에서 `miluju update-check`로 새 버전 감지 → 자동 업데이트 플로우 구현
+- **eval 커버리지 확대**: 현재 spec·ui·build·qa 4개 스킬만 평가 케이스가 있음. ship·ops·docs에 대한 평가 케이스 추가 + CI에서 자동 실행
+- **GitHub Actions 워크플로우 생성기**: `miluju ci-gen` 명령으로 프로젝트 기술 스택을 감지해 CI/CD YAML을 자동 생성 (ops 스킬의 Phase 2를 코드로 구현)
+- **스킬 커스터마이징 레이어**: `miluju.config.ts`에서 프로젝트별 오버라이드 설정 (예: 커밋 메시지를 영어로, 테스트 프레임워크를 Pytest로) → 생성기가 오버라이드 반영
+- **MCP 브라우저 도구 확장**: 성능 검수(LCP, CLS, FID), SEO 검수(메타태그, OG, 구조화데이터), 반응형 레이아웃 브레이크포인트 테스트
+- **대화형 스킬 호출 대시보드**: 웹 UI에서 스킬 파이프라인 시각화, 각 스킬의 현재 Phase 추적, 핸드오프 상태 모니터링
+- **플러그인 시스템**: 서드파티 스킬을 `miluju plugin install` 로 추가 — 커뮤니티 기여 스킬 마켓플레이스
+- **Issue 템플릿 자동 설치**: `miluju install` 시 `.github/ISSUE_TEMPLATE/`에 spec 스킬의 이슈 템플릿을, `.github/pull_request_template.md`에 ship 스킬의 PR 템플릿을 자동 설치

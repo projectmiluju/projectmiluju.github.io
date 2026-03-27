@@ -119,6 +119,13 @@ export const siteConfig = {
       folder: 'til/bookmaker-devlog',
       icon: '📖'
     },
+    {
+      slug: 'Miluju Studio 개발기',
+      name: 'Miluju Studio 개발기',
+      category: 'til',
+      folder: 'til/milujustudio-devlog',
+      icon: '🎬'
+    }
   ],
 };
 
