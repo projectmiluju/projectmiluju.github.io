@@ -1,0 +1,131 @@
+---
+title: "Miluju Studio - AI 에이전트 워크플로우 인프라"
+period: "2026.03 - 진행 중"
+role: "Solo Developer (Tooling)"
+stack: ["TypeScript", "Bun", "MCP SDK", "Node.js", "GitHub Actions"]
+links:
+  github: "https://github.com/projectmiluju/miluju-studio"
+highlights:
+  - "1인 개발자를 위한 AI 에이전트 워크플로우 인프라 — 설계부터 배포·문서화까지"
+  - "스킬 7종 → 8개 에이전트 포맷으로 자동 변환 (56파일, bun run gen)"
+  - "miluju install 원클릭 CLI — 스킬 + MCP 설정 + GitHub 템플릿 일괄 설치"
+  - "LLM-as-a-judge eval 시스템 — 스킬 변경 시 품질 회귀 테스트 (9개 케이스)"
+  - "브라우저 MCP 서버 — 한글 타이포그래피·접근성·디자인 토큰 실시간 검수"
+metrics:
+  - "8개 에이전트 × 7 스킬 = 56개 파일 단일 소스 자동 생성"
+  - "Claude Code, Cursor, Windsurf, Gemini CLI, OpenAI Codex, GitHub Copilot, Antigravity, AWS Kiro 지원"
+  - "GitHub Actions 태그 push → 자동 Release 파이프라인"
+order: 12
+draft: false
+---
+
+## 아이디어
+
+AI 에이전트로 개발하면 빠르다. 그런데 에이전트마다 포맷이 다르고, 스킬을 고쳤는데 응답 품질이 떨어졌는지 알 방법이 없고, 한글 프로젝트에서 영어권 관행을 그대로 따르면 맞지 않는 부분이 생긴다.
+
+```
+Claude Code는 /slash
+Cursor는 @mention
+Codex는 $skill
+    ↓
+같은 스킬을 8번 따로 써야 함?
+    ↓
+스킬 품질 떨어져도 모름
+    ↓
+한글 렌더링 버그 잡기 불편
+```
+
+**Miluju Studio의 답**: 스킬을 한 번 쓰면 8개 에이전트용으로 자동 변환한다. eval 시스템이 품질 회귀를 잡는다. 브라우저 MCP 서버로 한글 렌더링을 직접 검수한다.
+
+---
+
+## 스킬 파이프라인
+
+```
+/spec → /ui → /build → /qa → /ship → /ops → /docs
+ 명세    화면    구현     검증    출시    운영    기록
+```
+
+모든 스킬은 `_base.md` 공통 원칙을 공유한다 (1인 개발자 5원칙, 안티-아첨, 한글 프로젝트 지침, main 브랜치 보호 규칙). `_base.md` 수정 → `bun run gen` → 56개 파일 전체 반영.
+
+---
+
+## 아키텍처
+
+```
+skills/
+├── _base.md          ← 공통 원칙 (모든 스킬에 자동 주입)
+└── spec ~ docs.md    ← 7개 스킬 소스
+        ↓
+  bun run gen
+        ↓
+dist/skills/
+├── claude-code/      ← .claude/commands/
+├── cursor/           ← .cursor/rules/
+├── windsurf/         ← .windsurf/rules/
+├── gemini-cli/       ← skills/
+├── codex/            ← .codex/skills/
+├── copilot/          ← .github/instructions/
+├── antigravity/      ← .agent/skills/
+└── kiro/             ← .kiro/steering/
+```
+
+### 도구 구성
+
+```
+miluju-studio/
+├── skills/           ← 스킬 소스 (7 + _base)
+├── src/              ← 스킬 생성기 (TypeScript)
+├── browse/           ← MCP 브라우저 서버
+├── test/             ← LLM-as-a-judge eval
+├── bin/              ← CLI (install, update, doctor)
+└── dist/             ← 생성 결과물
+```
+
+---
+
+## 핵심 도구
+
+| 명령어 | 하는 일 |
+|--------|---------|
+| `bun run gen` | 스킬 1벌 → 8개 에이전트용 56파일 자동 변환 |
+| `miluju install` | 스킬 + MCP 설정 + GitHub 템플릿 원클릭 설치 |
+| `miluju update-check` | 스킬 버전 업데이트 확인 |
+| `miluju update` | 스킬 자동 업데이트 |
+| `miluju doctor` | 환경 진단 |
+| `bun run eval` | LLM-as-a-judge 품질 회귀 테스트 (9 케이스) |
+| `bun run browse` | 브라우저 MCP 서버 (한글·접근성·토큰 검수) |
+
+---
+
+## 지원 에이전트 (8종)
+
+| 에이전트 | 호출 방식 | 설치 경로 |
+|----------|-----------|-----------|
+| Claude Code | `/spec`, `/ui` ... | `.claude/commands/` |
+| Cursor | `@spec`, `@ui` ... | `.cursor/rules/` |
+| Windsurf | `@spec`, `@ui` ... | `.windsurf/rules/` |
+| Gemini CLI | 파일 참조 | `skills/` |
+| OpenAI Codex | `$spec`, `$ui` ... | `.codex/skills/` |
+| GitHub Copilot | 자동 주입 | `.github/instructions/` |
+| Antigravity | 시맨틱 매칭 | `.agent/skills/` |
+| AWS Kiro | `#spec`, `#ui` ... | `.kiro/steering/` |
+
+---
+
+## 설계 원칙
+
+**MCP 표준 채택**
+자체 통신 프로토콜 대신 Model Context Protocol을 써서 어떤 에이전트든 연결할 수 있게 한다.
+
+**느리지만 단단하게**
+"빨리 부수고 고치기"보다 설계와 문서를 챙겨 혼자서도 안심하고 나아가는 워크플로우를 만든다.
+
+**한글 네이티브**
+커밋 메시지, 테스트 이름, CHANGELOG까지 한국어. `word-break: keep-all` 미적용, 한글 폰트 미지정, IME 입력 버그 같은 문제를 브라우저에서 직접 검수한다.
+
+---
+
+## 원격 스킬 배포
+
+로컬에 `dist/skills/`가 없을 때 GitHub Releases 최신 태그 → Raw URL로 스킬을 자동으로 받아온다. 패키지 설치 없이 `miluju install`만 실행해도 최신 스킬이 대상 프로젝트에 설치된다.
